@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>idb-cache example</title>
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+		<script src="../dist/idb-cache.js"></script>
+		<script>
+      console.log(IDBCache);
+      var idbCache = new IDBCache("examples");
+      idbCache.set('foo', "test-value");
+      idbCache.set('bar', new ArrayBuffer(512));
+      idbCache.set('baz', new Blob([new ArrayBuffer(1024)]));
+      idbCache.get('foo').then(function(value){
+        document.write(value);
+      });
+      idbCache.delete('foo');
+		</script>
+	</body>
+</html>
