@@ -38,7 +38,7 @@ export default class IDBCache {
     return new Promise((resolve:Function, reject:Function) => {
       this._serializeData(value, (data, meta) => {
         if(meta.size === 0){
-          resolve();
+          reject();
           return;
         }
         this._open((db) => {
@@ -101,7 +101,7 @@ export default class IDBCache {
                 resolve(data);
               });
             }else{
-              resolve(undefined);
+              reject();
             }
           };
   
