@@ -49,7 +49,8 @@
   var DATA_TYPE_STRING = 1;
   var DATA_TYPE_ARRAYBUFFER = 2;
   var DATA_TYPE_BLOB = 3;
-  var isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent); // iPhone、iPod、iPadをiOSとする
+  // iPhone,iPod,iPad.
+  var isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent);
 
   var IDBCache = function () {
       function IDBCache(dbName, strageLimit) {
@@ -69,6 +70,14 @@
           }
           this._initialize();
       }
+      /**
+       * Save key-value in IndexedDB.
+       * Overwrite if the key already exists.
+       * @param key
+       * @param value
+       * @param maxAge Number of seconds to keep
+       */
+
 
       createClass(IDBCache, [{
           key: 'set',
@@ -80,7 +89,7 @@
               return new Promise(function (resolve, reject) {
                   _this._serializeData(value, function (data, meta) {
                       if (meta.size === 0) {
-                          resolve();
+                          reject();
                           return;
                       }
                       _this._open(function (db) {
@@ -122,6 +131,11 @@
                   });
               });
           }
+          /**
+           * Get value from IndexedDB.
+           * @param key
+           */
+
       }, {
           key: 'get',
           value: function get$$1(key) {
@@ -140,7 +154,7 @@
                                   resolve(data);
                               });
                           } else {
-                              resolve(undefined);
+                              reject();
                           }
                       };
                       request.onerror = function (_event) {
@@ -151,6 +165,11 @@
                   });
               });
           }
+          /**
+           * Delete one value of IndexedDB.
+           * @param key
+           */
+
       }, {
           key: 'delete',
           value: function _delete(key) {
@@ -194,14 +213,11 @@
               var _this4 = this;
 
               this._open(function (db) {
-                  var hoge = Date.now();
-                  console.warn("GET CACHE START");
                   var transaction = db.transaction(META_STORE_NAME, 'readonly');
                   var metaStore = transaction.objectStore(META_STORE_NAME);
                   _this4._metaCache.clear();
                   _this4._nowSize = 0;
                   metaStore.openCursor().onsuccess = function (event) {
-                      console.warn("GET CACHE");
                       var cursor = event.target.result;
                       if (cursor) {
                           _this4._metaCache.set(cursor.key, cursor.value);
@@ -210,14 +226,12 @@
                       }
                   };
                   transaction.oncomplete = function () {
-                      console.warn("GET CACHE COMP:" + (Date.now() - hoge));
                       transaction.oncomplete = null;
                       _this4._metaCache = new Map([].concat(toConsumableArray(_this4._metaCache.entries())).sort(function (a, b) {
                           if (a[1].expire < b[1].expire) return -1;
                           if (a[1].expire > b[1].expire) return 1;
                           return 0;
                       }));
-                      console.warn("SORT COMP:" + (Date.now() - hoge));
                       _this4._cleanup();
                   };
                   // TODO:Error handling.
@@ -306,16 +320,19 @@
                   meta.type = DATA_TYPE_BLOB;
                   meta.size = data.size;
               } else {
-                  console.warn('Unsupported type value');
+                  console.warn('Is not supported type of value');
               }
+              // IndexedDB on iOS does not support blob.
               if (isIOS && meta.type === DATA_TYPE_BLOB) {
                   var reader = new FileReader();
-                  reader.onload = function (_event) {
+                  reader.onload = function () {
+                      reader.onload = null;
                       meta.size = reader.result.byteLength;
                       meta.mime = data.type;
                       cb(reader.result, meta);
                   };
-                  reader.onerror = function (_event) {
+                  reader.onerror = function () {
+                      reader.onerror = null;
                       meta.size = 0;
                       cb(null, meta);
                   };

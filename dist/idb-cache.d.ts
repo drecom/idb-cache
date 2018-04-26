@@ -11,8 +11,23 @@ export default class IDBCache {
         count?: number;
         defaultAge?: number;
     });
+    /**
+     * Save key-value in IndexedDB.
+     * Overwrite if the key already exists.
+     * @param key
+     * @param value
+     * @param maxAge Number of seconds to keep
+     */
     set(key: string, value: string | ArrayBuffer | Blob, maxAge?: number): Promise<{}>;
+    /**
+     * Get value from IndexedDB.
+     * @param key
+     */
     get(key: string): Promise<{}>;
+    /**
+     * Delete one value of IndexedDB.
+     * @param key
+     */
     delete(key: string): Promise<{}>;
     private _initialize();
     private _cleanup();

@@ -10,7 +10,8 @@ const DATA_TYPE_STRING = 1;
 const DATA_TYPE_ARRAYBUFFER = 2;
 const DATA_TYPE_BLOB = 3;
 
-const isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent); // iPhone、iPod、iPadをiOSとする
+// iPhone,iPod,iPad.
+const isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent); 
 
 export default class IDBCache {
   private _indexedDB : IDBFactory;
@@ -34,6 +35,13 @@ export default class IDBCache {
     this._initialize();
   }
 
+  /**
+   * Save key-value in IndexedDB.
+   * Overwrite if the key already exists.
+   * @param key 
+   * @param value 
+   * @param maxAge Number of seconds to keep
+   */
   public set(key:string, value:string | ArrayBuffer | Blob, maxAge:number = this._defaultAge){
     return new Promise((resolve:Function, reject:Function) => {
       this._serializeData(value, (data, meta) => {
@@ -86,6 +94,10 @@ export default class IDBCache {
     });
   }
 
+  /**
+   * Get value from IndexedDB.
+   * @param key 
+   */
   public get(key:string){
     return new Promise((resolve:Function, reject:Function) => {
       this._open(
@@ -116,6 +128,10 @@ export default class IDBCache {
     });
   }
 
+  /**
+   * Delete one value of IndexedDB.
+   * @param key 
+   */
   public delete(key:string) {
     return new Promise((resolve:Function, reject:Function) => {
       this._open(
@@ -159,15 +175,12 @@ export default class IDBCache {
 
   private _initialize(){
     this._open((db) => {
-      const hoge = Date.now();
-      console.warn("GET CACHE START");
       const transaction = db.transaction(META_STORE_NAME, 'readonly');
       const metaStore = transaction.objectStore(META_STORE_NAME);
       this._metaCache.clear();
       this._nowSize = 0;
 
       metaStore.openCursor().onsuccess = (event:any) => {
-        console.warn("GET CACHE");
         const cursor = event.target.result;
         if (cursor) {
           this._metaCache.set(cursor.key, cursor.value);
@@ -177,14 +190,12 @@ export default class IDBCache {
       };
 
       transaction.oncomplete = () => {
-        console.warn("GET CACHE COMP:" + (Date.now() - hoge));
         transaction.oncomplete = null;
         this._metaCache = new Map([...this._metaCache.entries()].sort(function(a:any, b:any) {
           if (a[1].expire < b[1].expire) return -1;
           if (a[1].expire > b[1].expire) return 1;
           return 0;
         }));
-        console.warn("SORT COMP:" + (Date.now() - hoge));
         this._cleanup();
       }
       // TODO:Error handling.
@@ -265,17 +276,20 @@ export default class IDBCache {
       meta.type = DATA_TYPE_BLOB;
       meta.size = (data as Blob).size;
     }else{
-      console.warn('Unsupported type value');
+      console.warn('Is not supported type of value');
     }
 
+    // IndexedDB on iOS does not support blob.
     if(isIOS && meta.type === DATA_TYPE_BLOB){
       const reader = new FileReader();
-      reader.onload = (_event) => {
+      reader.onload = () => {
+        reader.onload = null;
         meta.size = (reader.result as ArrayBuffer).byteLength;
         (meta as any).mime = (data as Blob).type;
         cb(reader.result, meta);
       }
-      reader.onerror = (_event) => {
+      reader.onerror = () => {
+        reader.onerror = null;
         meta.size = 0;
         cb(null, meta);
       }

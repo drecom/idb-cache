@@ -1,9 +1,9 @@
 import babel from 'rollup-plugin-babel';
 
 export default {
-  intro: '/* @author Drecom Co.,Ltd. http://www.drecom.co.jp/ */',
   input: 'dist/idb-cache.js',
   output: {
+    intro: '/* @author Drecom Co.,Ltd. http://www.drecom.co.jp/ */',
     file: 'dist/idb-cache.js',
     format: 'umd',
     name: 'IDBCache',
