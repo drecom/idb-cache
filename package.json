@@ -5,7 +5,11 @@
   "main": "dist/idb-cache.js",
   "types": "dist/idb-cache.d.ts",
   "scripts": {
-    "build": "tsc && rollup -c && uglifyjs dist/idb-cache.js -o dist/idb-cache.min.js -cm -b beautify=false,preamble='\"// idb-cache - https://github.com/drecom/idb-cache\"'"
+    "test": "karma start",
+    "build": "npm run build:tsc && npm run build:rollup && npm run build:uglifyjs && npm test",
+    "build:tsc": "tsc",
+    "build:rollup": "rollup -c",
+    "build:uglifyjs": "uglifyjs dist/idb-cache.js -o dist/idb-cache.min.js -cm -b beautify=false,preamble='\"// idb-cache - https://github.com/drecom/idb-cache\"'"
   },
   "repository": {
     "type": "git",
@@ -24,6 +28,13 @@
   "devDependencies": {
     "babel-core": "^6.26.0",
     "babel-preset-es2015-rollup": "^3.0.0",
+    "chai": "^4.1.2",
+    "karma": "^2.0.2",
+    "karma-chai": "^0.1.0",
+    "karma-chrome-launcher": "^2.2.0",
+    "karma-mocha": "^1.3.0",
+    "karma-mocha-reporter": "^2.2.5",
+    "mocha": "^5.1.1",
     "rollup": "^0.58.1",
     "rollup-plugin-babel": "^3.0.3",
     "typescript": "^2.8.1",

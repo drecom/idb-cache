@@ -16,7 +16,7 @@ const DATA_TYPE = {
 }
 
 // iPhone/iPod/iPad
-const isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent); 
+const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent); 
 
 export default class IDBCache {
   private _indexedDB : IDBFactory;
@@ -73,11 +73,11 @@ export default class IDBCache {
             transaction.onabort = null;
             const cacheMeta = this._metaCache.get(key);
             if(cacheMeta){
-              this._nowSize -= cacheMeta.size;
               this._metaCache.delete(key);
+              this._nowSize -= cacheMeta.size;
             }
-            this._nowSize += meta.size;
             this._metaCache.set(key, meta);
+            this._nowSize += meta.size;
     
             if(this._maxCount < this._metaCache.size || this._maxSize < this._nowSize){
               this._cleanup();
@@ -166,8 +166,10 @@ export default class IDBCache {
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
-          if(this._metaCache.has(key)){
+          const cacheMeta = this._metaCache.get(key);
+          if(cacheMeta){
             this._metaCache.delete(key);
+            this._nowSize -= cacheMeta.size;
           }
           resolve();
         };
@@ -243,12 +245,11 @@ export default class IDBCache {
     this._open((db) => {
       const removeKeys = new Set();
       const nowSeconds = Math.floor(Date.now() / 1000);
-      let tmpNowSize = this._nowSize;
       let tmpNowCount = this._metaCache.size;
       this._metaCache.forEach((meta, key) => {
-        if(meta.expire < nowSeconds || this._maxSize < tmpNowSize || this._maxCount < tmpNowCount){
+        if(meta.expire < nowSeconds || this._maxSize < this._nowSize || this._maxCount < tmpNowCount){
           removeKeys.add(key);
-          tmpNowSize -= meta.size;
+          this._nowSize -= meta.size;
           tmpNowCount--;
         }
       });
@@ -258,11 +259,30 @@ export default class IDBCache {
         const dataStore = transaction.objectStore(STORE_NAME.DATA);
         transaction.oncomplete = () => {
           transaction.oncomplete = null;
+          transaction.onerror = null;
+          transaction.onabort = null;
           removeKeys.forEach((key) => {
             if(this._metaCache.has(key)) this._metaCache.delete(key);
           });
         };
-        // Do not catch abort and error
+        transaction.onerror = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
+          transaction.onabort = null;
+          this._nowSize = 0;
+          this._metaCache.forEach((meta) => {
+            this._nowSize += meta.size;
+          })
+        };
+        transaction.onabort = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
+          transaction.onabort = null;
+          this._nowSize = 0;
+          this._metaCache.forEach((meta) => {
+            this._nowSize += meta.size;
+          })
+        };
 
         removeKeys.forEach((key) => {
           try{

@@ -54,7 +54,7 @@
       BLOB: 3
   };
   // iPhone/iPod/iPad
-  var isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent);
+  var isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent);
 
   var IDBCache = function () {
       function IDBCache(dbName, strageLimit) {
@@ -112,11 +112,11 @@
                               transaction.onabort = null;
                               var cacheMeta = _this._metaCache.get(key);
                               if (cacheMeta) {
-                                  _this._nowSize -= cacheMeta.size;
                                   _this._metaCache.delete(key);
+                                  _this._nowSize -= cacheMeta.size;
                               }
-                              _this._nowSize += meta.size;
                               _this._metaCache.set(key, meta);
+                              _this._nowSize += meta.size;
                               if (_this._maxCount < _this._metaCache.size || _this._maxSize < _this._nowSize) {
                                   _this._cleanup();
                               }
@@ -206,8 +206,10 @@
                           transaction.oncomplete = null;
                           transaction.onerror = null;
                           transaction.onabort = null;
-                          if (_this3._metaCache.has(key)) {
+                          var cacheMeta = _this3._metaCache.get(key);
+                          if (cacheMeta) {
                               _this3._metaCache.delete(key);
+                              _this3._nowSize -= cacheMeta.size;
                           }
                           resolve();
                       };
@@ -281,12 +283,11 @@
               this._open(function (db) {
                   var removeKeys = new Set();
                   var nowSeconds = Math.floor(Date.now() / 1000);
-                  var tmpNowSize = _this5._nowSize;
                   var tmpNowCount = _this5._metaCache.size;
                   _this5._metaCache.forEach(function (meta, key) {
-                      if (meta.expire < nowSeconds || _this5._maxSize < tmpNowSize || _this5._maxCount < tmpNowCount) {
+                      if (meta.expire < nowSeconds || _this5._maxSize < _this5._nowSize || _this5._maxCount < tmpNowCount) {
                           removeKeys.add(key);
-                          tmpNowSize -= meta.size;
+                          _this5._nowSize -= meta.size;
                           tmpNowCount--;
                       }
                   });
@@ -296,11 +297,30 @@
                       var dataStore = transaction.objectStore(STORE_NAME.DATA);
                       transaction.oncomplete = function () {
                           transaction.oncomplete = null;
+                          transaction.onerror = null;
+                          transaction.onabort = null;
                           removeKeys.forEach(function (key) {
                               if (_this5._metaCache.has(key)) _this5._metaCache.delete(key);
                           });
                       };
-                      // Do not catch abort and error
+                      transaction.onerror = function () {
+                          transaction.oncomplete = null;
+                          transaction.onerror = null;
+                          transaction.onabort = null;
+                          _this5._nowSize = 0;
+                          _this5._metaCache.forEach(function (meta) {
+                              _this5._nowSize += meta.size;
+                          });
+                      };
+                      transaction.onabort = function () {
+                          transaction.oncomplete = null;
+                          transaction.onerror = null;
+                          transaction.onabort = null;
+                          _this5._nowSize = 0;
+                          _this5._metaCache.forEach(function (meta) {
+                              _this5._nowSize += meta.size;
+                          });
+                      };
                       removeKeys.forEach(function (key) {
                           try {
                               dataStore.delete(key);
