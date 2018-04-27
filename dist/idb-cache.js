@@ -44,12 +44,16 @@
    * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
    */
   var VERSION = 1;
-  var META_STORE_NAME = 'metastore';
-  var DATA_STORE_NAME = 'datastore';
-  var DATA_TYPE_STRING = 1;
-  var DATA_TYPE_ARRAYBUFFER = 2;
-  var DATA_TYPE_BLOB = 3;
-  // iPhone,iPod,iPad.
+  var STORE_NAME = {
+      META: 'metastore',
+      DATA: 'datastore'
+  };
+  var DATA_TYPE = {
+      STRING: 1,
+      ARRAYBUFFER: 2,
+      BLOB: 3
+  };
+  // iPhone/iPod/iPad
   var isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent);
 
   var IDBCache = function () {
@@ -57,12 +61,16 @@
           classCallCheck(this, IDBCache);
 
           this._maxSize = 52428800; // 50MB
-          this._maxCount = 100;
-          this._defaultAge = 86400;
+          this._maxCount = 100; // 100files
+          this._defaultAge = 86400; // 1day
           this._nowSize = 0;
           this._metaCache = new Map();
           this._indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.OIndexedDB || window.msIndexedDB;
           this._dbName = dbName;
+          if (!this._indexedDB) {
+              console.error('IndexedDB is not supported');
+              return;
+          }
           if (strageLimit) {
               if (strageLimit.size) this._maxSize = strageLimit.size;
               if (strageLimit.count) this._maxCount = strageLimit.count;
@@ -93,13 +101,15 @@
                           return;
                       }
                       _this._open(function (db) {
-                          var transaction = db.transaction([META_STORE_NAME, DATA_STORE_NAME], 'readwrite');
-                          var metaStore = transaction.objectStore(META_STORE_NAME);
-                          var dataStore = transaction.objectStore(DATA_STORE_NAME);
+                          var transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+                          var metaStore = transaction.objectStore(STORE_NAME.META);
+                          var dataStore = transaction.objectStore(STORE_NAME.DATA);
                           var nowSeconds = Math.floor(Date.now() / 1000);
                           meta.expire = nowSeconds + maxAge;
-                          transaction.oncomplete = function (_event) {
+                          transaction.oncomplete = function () {
                               transaction.oncomplete = null;
+                              transaction.onerror = null;
+                              transaction.onabort = null;
                               var cacheMeta = _this._metaCache.get(key);
                               if (cacheMeta) {
                                   _this._nowSize -= cacheMeta.size;
@@ -112,11 +122,15 @@
                               }
                               resolve();
                           };
-                          transaction.onerror = function (_event) {
+                          transaction.onerror = function () {
+                              transaction.oncomplete = null;
                               transaction.onerror = null;
+                              transaction.onabort = null;
                               reject();
                           };
-                          transaction.onabort = function (_event) {
+                          transaction.onabort = function () {
+                              transaction.oncomplete = null;
+                              transaction.onerror = null;
                               transaction.onabort = null;
                               reject();
                           };
@@ -127,12 +141,15 @@
                               console.error(e);
                               transaction.abort();
                           }
+                      }, function () {
+                          // Open error
+                          reject();
                       });
                   });
               });
           }
           /**
-           * Get value from IndexedDB.
+           * Get value from IndexedDB
            * @param key
            */
 
@@ -143,10 +160,12 @@
 
               return new Promise(function (resolve, reject) {
                   _this2._open(function (db) {
-                      var transaction = db.transaction(DATA_STORE_NAME, 'readonly');
-                      var dataStore = transaction.objectStore(DATA_STORE_NAME);
+                      var transaction = db.transaction(STORE_NAME.DATA, 'readonly');
+                      var dataStore = transaction.objectStore(STORE_NAME.DATA);
                       var request = dataStore.get(key);
-                      request.onsuccess = function (_event) {
+                      request.onsuccess = function () {
+                          request.onsuccess = null;
+                          request.onerror = null;
                           var nowSeconds = Math.floor(Date.now() / 1000);
                           var cacheMeta = _this2._metaCache.get(key);
                           if (request.result && cacheMeta && nowSeconds < cacheMeta.expire) {
@@ -157,16 +176,19 @@
                               reject();
                           }
                       };
-                      request.onerror = function (_event) {
+                      request.onerror = function () {
+                          request.onsuccess = null;
+                          request.onerror = null;
                           reject();
                       };
                   }, function () {
+                      // Open error
                       reject();
                   });
               });
           }
           /**
-           * Delete one value of IndexedDB.
+           * Delete one value of IndexedDB
            * @param key
            */
 
@@ -177,21 +199,27 @@
 
               return new Promise(function (resolve, reject) {
                   _this3._open(function (db) {
-                      var transaction = db.transaction([META_STORE_NAME, DATA_STORE_NAME], 'readwrite');
-                      var metaStore = transaction.objectStore(META_STORE_NAME);
-                      var dataStore = transaction.objectStore(DATA_STORE_NAME);
-                      transaction.oncomplete = function (_event) {
+                      var transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+                      var metaStore = transaction.objectStore(STORE_NAME.META);
+                      var dataStore = transaction.objectStore(STORE_NAME.DATA);
+                      transaction.oncomplete = function () {
                           transaction.oncomplete = null;
+                          transaction.onerror = null;
+                          transaction.onabort = null;
                           if (_this3._metaCache.has(key)) {
                               _this3._metaCache.delete(key);
                           }
                           resolve();
                       };
-                      transaction.onerror = function (_event) {
+                      transaction.onerror = function () {
+                          transaction.oncomplete = null;
                           transaction.onerror = null;
+                          transaction.onabort = null;
                           reject();
                       };
-                      transaction.onabort = function (_event) {
+                      transaction.onabort = function () {
+                          transaction.oncomplete = null;
+                          transaction.onerror = null;
                           transaction.onabort = null;
                           reject();
                       };
@@ -203,6 +231,7 @@
                           transaction.abort();
                       }
                   }, function () {
+                      // Open error
                       reject();
                   });
               });
@@ -213,10 +242,25 @@
               var _this4 = this;
 
               this._open(function (db) {
-                  var transaction = db.transaction(META_STORE_NAME, 'readonly');
-                  var metaStore = transaction.objectStore(META_STORE_NAME);
+                  var transaction = db.transaction(STORE_NAME.META, 'readonly');
+                  var metaStore = transaction.objectStore(STORE_NAME.META);
                   _this4._metaCache.clear();
                   _this4._nowSize = 0;
+                  transaction.oncomplete = function () {
+                      transaction.oncomplete = null;
+                      transaction.onerror = null;
+                      // Sort in ascending order of expire
+                      _this4._metaCache = new Map([].concat(toConsumableArray(_this4._metaCache.entries())).sort(function (a, b) {
+                          if (a[1].expire < b[1].expire) return -1;
+                          if (a[1].expire > b[1].expire) return 1;
+                          return 0;
+                      }));
+                      _this4._cleanup();
+                  };
+                  transaction.onerror = function () {
+                      transaction.oncomplete = null;
+                      transaction.onerror = null;
+                  };
                   metaStore.openCursor().onsuccess = function (event) {
                       var cursor = event.target.result;
                       if (cursor) {
@@ -225,16 +269,8 @@
                           cursor.continue();
                       }
                   };
-                  transaction.oncomplete = function () {
-                      transaction.oncomplete = null;
-                      _this4._metaCache = new Map([].concat(toConsumableArray(_this4._metaCache.entries())).sort(function (a, b) {
-                          if (a[1].expire < b[1].expire) return -1;
-                          if (a[1].expire > b[1].expire) return 1;
-                          return 0;
-                      }));
-                      _this4._cleanup();
-                  };
-                  // TODO:Error handling.
+              }, function () {
+                  // Ignore open error
               });
           }
       }, {
@@ -255,15 +291,16 @@
                       }
                   });
                   if (0 < removeKeys.size) {
-                      var transaction = db.transaction([META_STORE_NAME, DATA_STORE_NAME], 'readwrite');
-                      var metaStore = transaction.objectStore(META_STORE_NAME);
-                      var dataStore = transaction.objectStore(DATA_STORE_NAME);
-                      transaction.oncomplete = function (_event) {
+                      var transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+                      var metaStore = transaction.objectStore(STORE_NAME.META);
+                      var dataStore = transaction.objectStore(STORE_NAME.DATA);
+                      transaction.oncomplete = function () {
                           transaction.oncomplete = null;
                           removeKeys.forEach(function (key) {
                               if (_this5._metaCache.has(key)) _this5._metaCache.delete(key);
                           });
                       };
+                      // Do not catch abort and error
                       removeKeys.forEach(function (key) {
                           try {
                               dataStore.delete(key);
@@ -273,6 +310,8 @@
                           }
                       });
                   }
+              }, function () {
+                  // Ignore open error
               });
           }
       }, {
@@ -280,8 +319,8 @@
           value: function _createObjectStore(db, oldVersion) {
               if (oldVersion < 1) {
                   // Structure of first edition
-                  db.createObjectStore(META_STORE_NAME);
-                  db.createObjectStore(DATA_STORE_NAME);
+                  db.createObjectStore(STORE_NAME.META);
+                  db.createObjectStore(STORE_NAME.DATA);
               }
           }
       }, {
@@ -289,18 +328,33 @@
           value: function _open(success, error) {
               var _this6 = this;
 
+              if (!this._indexedDB) {
+                  error();
+                  return;
+              }
               var request = this._indexedDB.open(this._dbName, VERSION);
               request.onupgradeneeded = function (event) {
                   request.onupgradeneeded = null;
                   _this6._createObjectStore(request.result, event.oldVersion);
               };
-              request.onsuccess = function (_event) {
+              request.onblocked = function () {
+                  request.onblocked = null;
+                  alert('Please close other tabs');
+              };
+              request.onsuccess = function () {
+                  request.onupgradeneeded = null;
+                  request.onblocked = null;
                   request.onsuccess = null;
+                  request.onerror = null;
                   success(request.result);
               };
-              request.onerror = function (_event) {
+              request.onerror = function () {
+                  console.error('IndexedDB open failed');
+                  request.onupgradeneeded = null;
+                  request.onblocked = null;
+                  request.onsuccess = null;
                   request.onerror = null;
-                  if (error) error();
+                  error();
               };
           }
       }, {
@@ -311,19 +365,19 @@
                   size: 0
               };
               if (typeof data === 'string') {
-                  meta.type = DATA_TYPE_STRING;
+                  meta.type = DATA_TYPE.STRING;
                   meta.size = data.length;
               } else if (data instanceof ArrayBuffer) {
-                  meta.type = DATA_TYPE_ARRAYBUFFER;
+                  meta.type = DATA_TYPE.ARRAYBUFFER;
                   meta.size = data.byteLength;
               } else if (data instanceof Blob) {
-                  meta.type = DATA_TYPE_BLOB;
+                  meta.type = DATA_TYPE.BLOB;
                   meta.size = data.size;
               } else {
                   console.warn('Is not supported type of value');
               }
-              // IndexedDB on iOS does not support blob.
-              if (isIOS && meta.type === DATA_TYPE_BLOB) {
+              // IndexedDB on iOS does not support blob
+              if (isIOS && meta.type === DATA_TYPE.BLOB) {
                   var reader = new FileReader();
                   reader.onload = function () {
                       reader.onload = null;
@@ -346,13 +400,13 @@
           value: function _deserializeData(data, meta, cb) {
               var type = 0;
               if (typeof data === 'string') {
-                  type = DATA_TYPE_STRING;
+                  type = DATA_TYPE.STRING;
               } else if (data instanceof ArrayBuffer) {
-                  type = DATA_TYPE_ARRAYBUFFER;
+                  type = DATA_TYPE.ARRAYBUFFER;
               } else if (data instanceof Blob) {
-                  type = DATA_TYPE_BLOB;
+                  type = DATA_TYPE.BLOB;
               }
-              if (meta && meta.type === DATA_TYPE_BLOB && type === DATA_TYPE_ARRAYBUFFER) {
+              if (meta && meta.type === DATA_TYPE.BLOB && type === DATA_TYPE.ARRAYBUFFER) {
                   var blob = new Blob([data], { type: meta.mime });
                   cb(blob);
               } else {

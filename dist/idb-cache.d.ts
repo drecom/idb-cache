@@ -20,19 +20,19 @@ export default class IDBCache {
      */
     set(key: string, value: string | ArrayBuffer | Blob, maxAge?: number): Promise<{}>;
     /**
-     * Get value from IndexedDB.
+     * Get value from IndexedDB
      * @param key
      */
     get(key: string): Promise<{}>;
     /**
-     * Delete one value of IndexedDB.
+     * Delete one value of IndexedDB
      * @param key
      */
     delete(key: string): Promise<{}>;
     private _initialize();
     private _cleanup();
     private _createObjectStore(db, oldVersion);
-    private _open(success, error?);
+    private _open(success, error);
     private _serializeData(data, cb);
     private _deserializeData(data, meta, cb);
 }

@@ -3,22 +3,27 @@
  */
 
 const VERSION = 1;
-const META_STORE_NAME = 'metastore';
-const DATA_STORE_NAME = 'datastore';
 
-const DATA_TYPE_STRING = 1;
-const DATA_TYPE_ARRAYBUFFER = 2;
-const DATA_TYPE_BLOB = 3;
+const STORE_NAME = {
+  META : 'metastore',
+  DATA : 'datastore',
+}
 
-// iPhone,iPod,iPad.
+const DATA_TYPE = {
+  STRING : 1,
+  ARRAYBUFFER : 2,
+  BLOB : 3,
+}
+
+// iPhone/iPod/iPad
 const isIOS = /iP(hone|(o|a)d);/.test(navigator.userAgent); 
 
 export default class IDBCache {
   private _indexedDB : IDBFactory;
   private _dbName : string;
   private _maxSize : number = 52428800; // 50MB
-  private _maxCount : number = 100;
-  private _defaultAge : number = 86400;
+  private _maxCount : number = 100; // 100files
+  private _defaultAge : number = 86400; // 1day
   private _nowSize : number = 0;
   private _metaCache = new Map();
 
@@ -26,6 +31,12 @@ export default class IDBCache {
     this._indexedDB = (window as any).indexedDB || (window as any).webkitIndexedDB || (window as any).mozIndexedDB || (window as any).OIndexedDB || (window as any).msIndexedDB;
 
     this._dbName = dbName;
+
+    if(!this._indexedDB){
+      console.error('IndexedDB is not supported');
+      return;
+    }
+
     if(strageLimit){
       if(strageLimit.size) this._maxSize = strageLimit.size;
       if(strageLimit.count) this._maxCount = strageLimit.count;
@@ -50,14 +61,16 @@ export default class IDBCache {
           return;
         }
         this._open((db) => {
-          const transaction = db.transaction([META_STORE_NAME, DATA_STORE_NAME], 'readwrite');
-          const metaStore = transaction.objectStore(META_STORE_NAME);
-          const dataStore = transaction.objectStore(DATA_STORE_NAME);
+          const transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+          const metaStore = transaction.objectStore(STORE_NAME.META);
+          const dataStore = transaction.objectStore(STORE_NAME.DATA);
           const nowSeconds = Math.floor(Date.now() / 1000);
           meta.expire = nowSeconds + maxAge;
     
-          transaction.oncomplete = (_event) => {
+          transaction.oncomplete = () => {
             transaction.oncomplete = null;
+            transaction.onerror = null;
+            transaction.onabort = null;
             const cacheMeta = this._metaCache.get(key);
             if(cacheMeta){
               this._nowSize -= cacheMeta.size;
@@ -72,12 +85,16 @@ export default class IDBCache {
             resolve();
           };
     
-          transaction.onerror = (_event) => {
+          transaction.onerror = () => {
+            transaction.oncomplete = null;
             transaction.onerror = null;
+            transaction.onabort = null;
             reject();
           };
     
-          transaction.onabort = (_event) => {
+          transaction.onabort = () => {
+            transaction.oncomplete = null;
+            transaction.onerror = null;
             transaction.onabort = null;
             reject();
           }
@@ -89,96 +106,124 @@ export default class IDBCache {
             console.error(e);
             transaction.abort();
           }
+        }, () => {
+          // Open error
+          reject();
         });  
       })
     });
   }
 
   /**
-   * Get value from IndexedDB.
+   * Get value from IndexedDB
    * @param key 
    */
   public get(key:string){
     return new Promise((resolve:Function, reject:Function) => {
-      this._open(
-        (db) => {
-          const transaction = db.transaction(DATA_STORE_NAME, 'readonly');
-          const dataStore = transaction.objectStore(DATA_STORE_NAME);
-          let request = dataStore.get(key);
-          request.onsuccess = (_event) => {
-            const nowSeconds = Math.floor(Date.now() / 1000);
-            const cacheMeta = this._metaCache.get(key);
-            if(request.result && cacheMeta && nowSeconds < cacheMeta.expire){
-              this._deserializeData(request.result, cacheMeta, (data) => {
-                resolve(data);
-              });
-            }else{
-              reject();
-            }
-          };
-  
-          request.onerror = (_event) => {
+      this._open((db) => {
+        const transaction = db.transaction(STORE_NAME.DATA, 'readonly');
+        const dataStore = transaction.objectStore(STORE_NAME.DATA);
+        const request = dataStore.get(key);
+        request.onsuccess = () => {
+          request.onsuccess = null;
+          request.onerror = null;
+          const nowSeconds = Math.floor(Date.now() / 1000);
+          const cacheMeta = this._metaCache.get(key);
+          if(request.result && cacheMeta && nowSeconds < cacheMeta.expire){
+            this._deserializeData(request.result, cacheMeta, (data) => {
+              resolve(data);
+            });
+          }else{
             reject();
-          };
-        },
-        () => {
+          }
+        };
+
+        request.onerror = () => {
+          request.onsuccess = null;
+          request.onerror = null;
           reject();
-        }
-      );
+        };
+      },
+      () => {
+        // Open error
+        reject();
+      });
     });
   }
 
   /**
-   * Delete one value of IndexedDB.
+   * Delete one value of IndexedDB
    * @param key 
    */
   public delete(key:string) {
     return new Promise((resolve:Function, reject:Function) => {
-      this._open(
-        (db) => {
-          const transaction = db.transaction([META_STORE_NAME, DATA_STORE_NAME], 'readwrite');
-          const metaStore = transaction.objectStore(META_STORE_NAME);
-          const dataStore = transaction.objectStore(DATA_STORE_NAME);
+      this._open((db) => {
+        const transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+        const metaStore = transaction.objectStore(STORE_NAME.META);
+        const dataStore = transaction.objectStore(STORE_NAME.DATA);
+
+        transaction.oncomplete = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
+          transaction.onabort = null;
+          if(this._metaCache.has(key)){
+            this._metaCache.delete(key);
+          }
+          resolve();
+        };
   
-          transaction.oncomplete = (_event) => {
-            transaction.oncomplete = null;
-            if(this._metaCache.has(key)){
-              this._metaCache.delete(key);
-            }
-            resolve();
-          };
-    
-          transaction.onerror = (_event) => {
-            transaction.onerror = null;
-            reject();
-          };
-    
-          transaction.onabort = (_event) => {
-            transaction.onabort = null;
-            reject();
-          }
-    
-          try{
-            dataStore.delete(key);
-            metaStore.delete(key);
-          }catch(e){
-            console.error(e);
-            transaction.abort();
-          }
-        },
-        () => {
+        transaction.onerror = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
+          transaction.onabort = null;
+          reject();
+        };
+  
+        transaction.onabort = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
+          transaction.onabort = null;
           reject();
         }
-      );
+  
+        try{
+          dataStore.delete(key);
+          metaStore.delete(key);
+        }catch(e){
+          console.error(e);
+          transaction.abort();
+        }
+      },
+      () => {
+        // Open error
+        reject();
+      });
     });
   }
 
   private _initialize(){
     this._open((db) => {
-      const transaction = db.transaction(META_STORE_NAME, 'readonly');
-      const metaStore = transaction.objectStore(META_STORE_NAME);
+      const transaction = db.transaction(STORE_NAME.META, 'readonly');
+      const metaStore = transaction.objectStore(STORE_NAME.META);
       this._metaCache.clear();
       this._nowSize = 0;
+
+      transaction.oncomplete = () => {
+        transaction.oncomplete = null;
+        transaction.onerror = null;
+        // Sort in ascending order of expire
+        this._metaCache = new Map([...this._metaCache.entries()].sort(function(a:any, b:any) {
+          if (a[1].expire < b[1].expire) return -1;
+          if (a[1].expire > b[1].expire) return 1;
+          return 0;
+        }));
+        this._cleanup();
+      }
+
+      transaction.onerror = () => {
+        transaction.oncomplete = null;
+        transaction.onerror = null;
+      }
 
       metaStore.openCursor().onsuccess = (event:any) => {
         const cursor = event.target.result;
@@ -189,16 +234,8 @@ export default class IDBCache {
         };
       };
 
-      transaction.oncomplete = () => {
-        transaction.oncomplete = null;
-        this._metaCache = new Map([...this._metaCache.entries()].sort(function(a:any, b:any) {
-          if (a[1].expire < b[1].expire) return -1;
-          if (a[1].expire > b[1].expire) return 1;
-          return 0;
-        }));
-        this._cleanup();
-      }
-      // TODO:Error handling.
+    }, () => {
+      // Ignore open error
     });
   }
 
@@ -216,15 +253,17 @@ export default class IDBCache {
         }
       });
       if(0 < removeKeys.size){
-        const transaction = db.transaction([META_STORE_NAME, DATA_STORE_NAME], 'readwrite');
-        const metaStore = transaction.objectStore(META_STORE_NAME);
-        const dataStore = transaction.objectStore(DATA_STORE_NAME);
-        transaction.oncomplete = (_event) => {
+        const transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+        const metaStore = transaction.objectStore(STORE_NAME.META);
+        const dataStore = transaction.objectStore(STORE_NAME.DATA);
+        transaction.oncomplete = () => {
           transaction.oncomplete = null;
           removeKeys.forEach((key) => {
             if(this._metaCache.has(key)) this._metaCache.delete(key);
           });
         };
+        // Do not catch abort and error
+
         removeKeys.forEach((key) => {
           try{
             dataStore.delete(key);
@@ -234,31 +273,49 @@ export default class IDBCache {
           }
         });
       }
+    }, () => {
+      // Ignore open error
     });
   }
 
   private _createObjectStore(db:IDBDatabase ,oldVersion:number){
     if(oldVersion < 1){
       // Structure of first edition
-      db.createObjectStore(META_STORE_NAME);
-      db.createObjectStore(DATA_STORE_NAME);
+      db.createObjectStore(STORE_NAME.META);
+      db.createObjectStore(STORE_NAME.DATA);
     }
   }
 
-  private _open(success:(db:IDBDatabase) => void, error?:Function){
+  private _open(success:(db:IDBDatabase) => void, error:Function){
+    if(!this._indexedDB){
+      error();
+      return;
+    }
+
     let request = this._indexedDB.open(this._dbName, VERSION);
     request.onupgradeneeded = (event) => {
       request.onupgradeneeded = null;
       this._createObjectStore(request.result as IDBDatabase, event.oldVersion);
     }
-    request.onsuccess = (_event) => {
+    request.onblocked = () => {
+      request.onblocked = null;
+      alert('Please close other tabs');
+    }
+    request.onsuccess = () => {
+      request.onupgradeneeded = null;
+      request.onblocked = null;
       request.onsuccess = null;
+      request.onerror = null;
       success(request.result);
     }
-    request.onerror = (_event) => {
+    request.onerror = () => {
+      console.error('IndexedDB open failed');
+      request.onupgradeneeded = null;
+      request.onblocked = null;
+      request.onsuccess = null;
       request.onerror = null;
-      if(error) error();
-    }    
+      error();
+    }
   }
 
   private _serializeData(data:string | ArrayBuffer | Blob, cb:(data:any, meta:any) => void){
@@ -267,20 +324,20 @@ export default class IDBCache {
       size:0,
     }
     if(typeof data === 'string'){
-      meta.type = DATA_TYPE_STRING;
+      meta.type = DATA_TYPE.STRING;
       meta.size = (data as string).length;
     }else if(data instanceof ArrayBuffer){
-      meta.type = DATA_TYPE_ARRAYBUFFER;
+      meta.type = DATA_TYPE.ARRAYBUFFER;
       meta.size = (data as ArrayBuffer).byteLength;
     }else if(data instanceof Blob){
-      meta.type = DATA_TYPE_BLOB;
+      meta.type = DATA_TYPE.BLOB;
       meta.size = (data as Blob).size;
     }else{
       console.warn('Is not supported type of value');
     }
 
-    // IndexedDB on iOS does not support blob.
-    if(isIOS && meta.type === DATA_TYPE_BLOB){
+    // IndexedDB on iOS does not support blob
+    if(isIOS && meta.type === DATA_TYPE.BLOB){
       const reader = new FileReader();
       reader.onload = () => {
         reader.onload = null;
@@ -302,14 +359,14 @@ export default class IDBCache {
   private _deserializeData(data:string | ArrayBuffer | Blob, meta:any, cb:(data:any) => void){
     let type = 0;
     if(typeof data === 'string'){
-      type = DATA_TYPE_STRING;
+      type = DATA_TYPE.STRING;
     }else if(data instanceof ArrayBuffer){
-      type = DATA_TYPE_ARRAYBUFFER;
+      type = DATA_TYPE.ARRAYBUFFER;
     }else if(data instanceof Blob){
-      type = DATA_TYPE_BLOB;
+      type = DATA_TYPE.BLOB;
     }
 
-    if(meta && meta.type === DATA_TYPE_BLOB && type === DATA_TYPE_ARRAYBUFFER){
+    if(meta && meta.type === DATA_TYPE.BLOB && type === DATA_TYPE.ARRAYBUFFER){
       const blob = new Blob([data], {type:meta.mime});
       cb(blob);
     }else{
