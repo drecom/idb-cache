@@ -48,91 +48,160 @@ describe('Basic', function() {
   });
   describe('#delete', function() {
     it('string', function() {
-      return idbc.delete('foo').then(() => {
-        return idbc.get('foo').then(() => {
-          assert.fail();
-        }).catch(() => {
-          assert.ok(true);
-        })
-      });
+      return idbc.delete('foo')
+      .then(
+        () => idbc.get('foo')
+      ).then(
+        () => assert.fail(),
+        () => assert.ok(true)
+      );
     });
     it('ArrayBuffer', function() {
-      return idbc.delete('bar').then(() => {
-        return idbc.get('bar').then(() => {
-          assert.fail();
-        }).catch(() => {
-          assert.ok(true);
-        })
-      });
+      return idbc.delete('bar')
+      .then(
+        () => idbc.get('bar')
+      ).then(
+        () => assert.fail(),
+        () => assert.ok(true)
+      );
     });
     it('Blob', function() {
-      return idbc.delete('foo').then(() => {
-        return idbc.get('bar').then(() => {
-          assert.fail();
-        }).catch(() => {
-          assert.ok(true);
-        })
-      });
+      return idbc.delete('baz')
+      .then(
+        () => idbc.get('baz')
+      ).then(
+        () => assert.fail(),
+        () => assert.ok(true)
+      );
     });
   });
 });
 
-describe('Management', function() {
+describe('Limit Management', function() {
   let idbc;
   before(function() {
-    idbc = new IDBCache('Management', {size:128, count:2, defaultAge:1});
+    idbc = new IDBCache('Limit', {size:128, count:2, defaultAge:2});
   });
   describe('#size', function() {
     it('Can save up to the limit', function() {
-      idbc.set('foo',  new ArrayBuffer(64));
-      idbc.set('bar', new ArrayBuffer(64));
-      return idbc.get('foo').then((data) => {
+      return idbc.set('foo',  new ArrayBuffer(64))
+      .then(
+        () => idbc.set('bar', new ArrayBuffer(64))
+      ).then(
+        () => idbc.get('foo')
+      ).then((data) => {
         assert.instanceOf(data, ArrayBuffer);
         assert.strictEqual(data.byteLength, 64);
-        return idbc.get('bar').then((data) => {
-          assert.instanceOf(data, ArrayBuffer);
-          assert.strictEqual(data.byteLength, 64);
-        });
+        return idbc.get('bar');
+      }).then((data) => {
+        assert.instanceOf(data, ArrayBuffer);
+        assert.strictEqual(data.byteLength, 64);
       });
     });
     it('Delete if exceeding the limit', function() {
-      idbc.set('foo',  new ArrayBuffer(64));
-      idbc.set('bar', new ArrayBuffer(65));
-      return idbc.get('foo').then((data) => {
-        assert.fail();
-      }).catch(() => {
-        return idbc.get('bar').then((data) => {
-          assert.instanceOf(data, ArrayBuffer);
-          assert.strictEqual(data.byteLength, 65);
-        });
+      return idbc.set('foo',  new ArrayBuffer(64))
+      .then(
+        () => idbc.set('bar', new ArrayBuffer(65))
+      ).then(
+        () => idbc.get('foo')
+      ).then(
+        () => assert.fail(), // foo should have been deleted
+        () => idbc.get('bar')
+      ).then((data) => {
+        assert.instanceOf(data, ArrayBuffer);
+        assert.strictEqual(data.byteLength, 65);
       });
     });
   });
   describe('#count', function() {
     it('Can save up to the limit', function() {
-      idbc.set('foo', 'foo-value');
-      idbc.set('bar', 'bar-value');
-      return idbc.get('foo').then((data) => {
+      return idbc.set('foo', 'foo-value')
+      .then(
+        () => idbc.set('bar', 'bar-value')
+      ).then(
+        () => idbc.get('foo')
+      ).then((data) => {
         assert.strictEqual(data, 'foo-value');
-        return idbc.get('bar').then((data) => {
-          assert.strictEqual(data, 'bar-value');
-        });
+        return idbc.get('bar');
+      }).then((data) => {
+        assert.strictEqual(data, 'bar-value');
       });
     });
     it('Delete if exceeding the limit', function() {
-      idbc.set('foo', 'foo-value');
-      idbc.set('bar', 'bar-value');
-      idbc.set('baz', 'baz-value');
-      return idbc.get('foo').then((data) => {
-        assert.fail();
-      }).catch(() => {
-        return idbc.get('bar').then((data) => {
-          assert.strictEqual(data, 'bar-value');
-          return idbc.get('baz').then((data) => {
-            assert.strictEqual(data, 'baz-value');
-          });
-        });
+      return idbc.set('foo', 'foo-value')
+      .then(
+        () => idbc.set('bar', 'bar-value')
+      ).then(
+        () => idbc.set('baz', 'baz-value')
+      ).then(
+        () => idbc.get('foo')
+      ).then(
+        () => assert.fail(), // foo should have been deleted
+        () => idbc.get('bar')
+      ).then((data) => {
+        assert.strictEqual(data, 'bar-value');
+        return idbc.get('baz');
+      }).then((data) => {
+        assert.strictEqual(data, 'baz-value');
       });
+    });
+  });
+  describe('#age', function() {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    it('Can save up to the expire', function() {
+      return idbc.set('foo', 'foo-value')
+      .then(
+        () => idbc.set('bar', 'bar-value')
+      ).then(
+        () => wait(1000)
+      ).then(
+        () => idbc.get('foo')
+      ).then((data) => {
+        assert.strictEqual(data, 'foo-value');
+        return idbc.get('bar');
+      }).then((data) => {
+        assert.strictEqual(data, 'bar-value');
+      });
+    });
+
+    it('Delete if exceeding the expire', function() {
+      this.timeout(4000);
+
+      return idbc.set('foo', 'foo-value')
+      .then(
+        () => idbc.set('bar', 'bar-value')
+      ).then(
+        () => wait(3000)
+      ).then(
+        () => idbc.get('foo')
+      ).then(
+        () => assert.fail(), // foo should have been deleted
+        () => idbc.get('bar')
+      ).then(
+        () => assert.fail(), // bar should have been deleted
+        () => assert.ok(true)
+      );
+    });
+
+    it('Delete in ascending order of expire', function() {
+      this.timeout(4000);
+
+      idbc.set('foo', 'foo-value', 2); // Save for 2 seconds
+      idbc.set('bar', 'bar-value', 1); // Save for 1 seconds
+      idbc.set('baz', 'baz-value', 2); // Save for 2 seconds
+
+      return wait(3000)
+      .then(
+        () => idbc.get('foo')
+      ).then(
+        () => idbc.get('baz')
+      ).then(
+        () => idbc.get('bar')
+      ).then(
+        () => assert.fail(), // bar should have been deleted
+        () => assert.ok(true)
+      );
     });
   });
 });
