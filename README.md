@@ -9,7 +9,7 @@ IndexedDB is persistent storage, but idb-cache automatically destroys old files.
 ## Initialization
 
 ```
-const idbc = new IDBCache("examplesDB", {
+const idbc = new IDBCache('examplesDB', {
   size : 52428800, // Size limit (Default 50MB)
   count : 100, // Number of files limit (Default 100)
   defaultAge : 86400, // max-age when there is no setting (Default 1day)
@@ -20,8 +20,8 @@ const idbc = new IDBCache("examplesDB", {
 
 ```
 // Designate max-age
-idbc.set('key1', "value1"); // defaultAge cache
-idbc.set('key2', "value2", 604800); // 1week cache
+idbc.set('key1', 'value1'); // defaultAge cache
+idbc.set('key2', 'value2', 604800); // 1week cache
 
 // Supported type
 idbc.set('key3', new ArrayBuffer(512)); // ArrayBuffer
