@@ -1,5 +1,3 @@
-/// <reference path="../dist/idb-cache.d.ts" />
-
 describe('Basic', function() {
   let idbc;
   before(function() {
