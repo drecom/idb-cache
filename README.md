@@ -37,3 +37,10 @@ idbc.get('key1').then(function(value){
   // Does not exist, expired or error
 });
 ```
+
+# Target
+
+idb-cache is focused on support of the following browsers.
+
+ - Chrome for Android
+ - iOS Safari (Support from v10)
