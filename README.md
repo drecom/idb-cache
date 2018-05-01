@@ -1,5 +1,8 @@
 # idb-cache
 
+[![Build Status](https://travis-ci.org/drecom/idb-cache.svg?branch=master)](https://travis-ci.org/drecom/idb-cache)
+[![license](https://img.shields.io/github/license/drecom/idb-cache.svg)](LICENSE)
+
 idb-cache is a fast and simple cache library for JavaScript using IndexedDB.
 
 IndexedDB is persistent storage, but idb-cache automatically destroys old files. Therefore, users do not have to worry about storage pressure due to garbage files.
