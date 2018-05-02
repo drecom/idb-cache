@@ -1,0 +1,6 @@
+# whitelist
+*
+.*
+!README.md
+!dist/idb-cache.js
+!dist/idb-cache.d.ts

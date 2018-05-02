@@ -1,7 +1,7 @@
 {
-  "name": "idb-cache",
-  "version": "0.0.1",
-  "description": "WIP",
+  "name": "@drecom/idb-cache",
+  "version": "0.0.2",
+  "description": "idb-cache is a fast and simple cache library for JavaScript using IndexedDB",
   "main": "dist/idb-cache.js",
   "types": "dist/idb-cache.d.ts",
   "scripts": {
@@ -17,6 +17,8 @@
   },
   "keywords": [
     "IndexedDB",
+    "storage",
+    "limit",
     "cache"
   ],
   "author": "Drecom Co.,Ltd.",

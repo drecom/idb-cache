@@ -1,6 +1,7 @@
 # idb-cache
 
 [![Build Status](https://travis-ci.org/drecom/idb-cache.svg?branch=master)](https://travis-ci.org/drecom/idb-cache)
+[![npm version](https://badge.fury.io/js/%40drecom%2Fidb-cache.svg)](https://badge.fury.io/js/%40drecom%2Fidb-cache)
 [![license](https://img.shields.io/github/license/drecom/idb-cache.svg)](LICENSE)
 
 idb-cache is a fast and simple cache library for JavaScript using IndexedDB.
