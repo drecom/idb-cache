@@ -13,6 +13,24 @@ describe('Basic', function() {
     it('Blob', function() {
       return idbc.set('baz', new Blob([new ArrayBuffer(128)]));
     });
+    it('empty string is ERROR.INVALID_ARGUMENT', function() {
+      return idbc.set('empty', '').then(
+        () => assert.fail(),
+        (errorCode) => assert.deepEqual(IDBCache.ERROR.INVALID_ARGUMENT, errorCode)
+      );
+    });
+    it('empty ArrayBuffer is ERROR.INVALID_ARGUMENT', function() {
+      return idbc.set('empty', new ArrayBuffer()).then(
+        () => assert.fail(),
+        (errorCode) => assert.deepEqual(IDBCache.ERROR.INVALID_ARGUMENT, errorCode)
+      );
+    });
+    it('empty Blob is ERROR.INVALID_ARGUMENT', function() {
+      return idbc.set('empty', new Blob([new ArrayBuffer()])).then(
+        () => assert.fail(),
+        (errorCode) => assert.deepEqual(IDBCache.ERROR.INVALID_ARGUMENT, errorCode)
+      );
+    });
   });
   describe('#update', function() {
     it('string', function() {
@@ -42,6 +60,12 @@ describe('Basic', function() {
         assert.instanceOf(data, Blob);
         assert.strictEqual(data.size, 256);
       });
+    });
+    it('Can not find is ERROR.GET_EMPTY', function() {
+      return idbc.get('empty').then(
+        () => assert.fail(),
+        (errorCode) => assert.deepEqual(IDBCache.ERROR.GET_EMPTY, errorCode)
+      );
     });
   });
   describe('#delete', function() {
@@ -175,10 +199,13 @@ describe('Limit Management', function() {
         () => idbc.get('foo')
       ).then(
         () => assert.fail(), // foo should have been deleted
-        () => idbc.get('bar')
+        (errorCode) => {
+          assert.deepEqual(IDBCache.ERROR.GET_EMPTY, errorCode)
+          return idbc.get('bar');
+        }
       ).then(
         () => assert.fail(), // bar should have been deleted
-        () => assert.ok(true)
+        (errorCode) => assert.deepEqual(IDBCache.ERROR.GET_EMPTY, errorCode)
       );
     });
 
@@ -198,7 +225,7 @@ describe('Limit Management', function() {
         () => idbc.get('bar')
       ).then(
         () => assert.fail(), // bar should have been deleted
-        () => assert.ok(true)
+        (errorCode) => assert.deepEqual(IDBCache.ERROR.GET_EMPTY, errorCode)
       );
     });
   });

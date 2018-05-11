@@ -19,6 +19,12 @@ const DATA_TYPE = {
 const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent); 
 
 export default class IDBCache {
+  public static ERROR = {
+    INVALID_ARGUMENT : 1,
+    CANNOT_OPEN : 2,
+    REQUEST_FAILED : 3,
+    GET_EMPTY : 4,
+  }
   private _indexedDB : IDBFactory;
   private _dbName : string;
   private _maxSize : number = 52428800; // 50MB
@@ -57,7 +63,7 @@ export default class IDBCache {
     return new Promise((resolve:Function, reject:Function) => {
       this._serializeData(value, (data, meta) => {
         if(meta.size === 0){
-          reject();
+          reject(IDBCache.ERROR.INVALID_ARGUMENT);
           return;
         }
         this._open((db) => {
@@ -89,14 +95,14 @@ export default class IDBCache {
             transaction.oncomplete = null;
             transaction.onerror = null;
             transaction.onabort = null;
-            reject();
+            reject(IDBCache.ERROR.REQUEST_FAILED);
           };
     
           transaction.onabort = () => {
             transaction.oncomplete = null;
             transaction.onerror = null;
             transaction.onabort = null;
-            reject();
+            reject(IDBCache.ERROR.REQUEST_FAILED);
           }
     
           try{
@@ -108,7 +114,7 @@ export default class IDBCache {
           }
         }, () => {
           // Open error
-          reject();
+          reject(IDBCache.ERROR.CANNOT_OPEN);
         });  
       })
     });
@@ -134,19 +140,20 @@ export default class IDBCache {
               resolve(data);
             });
           }else{
-            reject();
+            // Can not find or expired
+            reject(IDBCache.ERROR.GET_EMPTY);
           }
         };
 
         request.onerror = () => {
           request.onsuccess = null;
           request.onerror = null;
-          reject();
+          reject(IDBCache.ERROR.REQUEST_FAILED);
         };
       },
       () => {
         // Open error
-        reject();
+        reject(IDBCache.ERROR.CANNOT_OPEN);
       });
     });
   }
@@ -178,14 +185,14 @@ export default class IDBCache {
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
-          reject();
+          reject(IDBCache.ERROR.REQUEST_FAILED);
         };
   
         transaction.onabort = () => {
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
-          reject();
+          reject(IDBCache.ERROR.REQUEST_FAILED);
         }
   
         try{
@@ -198,7 +205,7 @@ export default class IDBCache {
       },
       () => {
         // Open error
-        reject();
+        reject(IDBCache.ERROR.CANNOT_OPEN);
       });
     });
   }
