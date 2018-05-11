@@ -273,6 +273,7 @@ export default class IDBCache {
           });
         };
         transaction.onerror = () => {
+          console.error('IndexedDB cleanup failed');
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
@@ -282,6 +283,7 @@ export default class IDBCache {
           })
         };
         transaction.onabort = () => {
+          console.error('IndexedDB cleanup failed');
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
