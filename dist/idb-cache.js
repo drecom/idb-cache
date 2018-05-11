@@ -97,7 +97,7 @@
               return new Promise(function (resolve, reject) {
                   _this._serializeData(value, function (data, meta) {
                       if (meta.size === 0) {
-                          reject();
+                          reject(IDBCache.ERROR.INVALID_ARGUMENT);
                           return;
                       }
                       _this._open(function (db) {
@@ -126,13 +126,13 @@
                               transaction.oncomplete = null;
                               transaction.onerror = null;
                               transaction.onabort = null;
-                              reject();
+                              reject(IDBCache.ERROR.REQUEST_FAILED);
                           };
                           transaction.onabort = function () {
                               transaction.oncomplete = null;
                               transaction.onerror = null;
                               transaction.onabort = null;
-                              reject();
+                              reject(IDBCache.ERROR.REQUEST_FAILED);
                           };
                           try {
                               dataStore.put(data, key);
@@ -143,7 +143,7 @@
                           }
                       }, function () {
                           // Open error
-                          reject();
+                          reject(IDBCache.ERROR.CANNOT_OPEN);
                       });
                   });
               });
@@ -173,17 +173,18 @@
                                   resolve(data);
                               });
                           } else {
-                              reject();
+                              // Can not find or expired
+                              reject(IDBCache.ERROR.GET_EMPTY);
                           }
                       };
                       request.onerror = function () {
                           request.onsuccess = null;
                           request.onerror = null;
-                          reject();
+                          reject(IDBCache.ERROR.REQUEST_FAILED);
                       };
                   }, function () {
                       // Open error
-                      reject();
+                      reject(IDBCache.ERROR.CANNOT_OPEN);
                   });
               });
           }
@@ -217,13 +218,13 @@
                           transaction.oncomplete = null;
                           transaction.onerror = null;
                           transaction.onabort = null;
-                          reject();
+                          reject(IDBCache.ERROR.REQUEST_FAILED);
                       };
                       transaction.onabort = function () {
                           transaction.oncomplete = null;
                           transaction.onerror = null;
                           transaction.onabort = null;
-                          reject();
+                          reject(IDBCache.ERROR.REQUEST_FAILED);
                       };
                       try {
                           dataStore.delete(key);
@@ -234,7 +235,7 @@
                       }
                   }, function () {
                       // Open error
-                      reject();
+                      reject(IDBCache.ERROR.CANNOT_OPEN);
                   });
               });
           }
@@ -304,6 +305,7 @@
                           });
                       };
                       transaction.onerror = function () {
+                          console.error('IndexedDB cleanup failed');
                           transaction.oncomplete = null;
                           transaction.onerror = null;
                           transaction.onabort = null;
@@ -313,6 +315,7 @@
                           });
                       };
                       transaction.onabort = function () {
+                          console.error('IndexedDB cleanup failed');
                           transaction.oncomplete = null;
                           transaction.onerror = null;
                           transaction.onabort = null;
@@ -436,6 +439,13 @@
       }]);
       return IDBCache;
   }();
+
+  IDBCache.ERROR = {
+      INVALID_ARGUMENT: 1,
+      CANNOT_OPEN: 2,
+      REQUEST_FAILED: 3,
+      GET_EMPTY: 4
+  };
 
   return IDBCache;
 

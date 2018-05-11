@@ -1,4 +1,10 @@
 export default class IDBCache {
+    static ERROR: {
+        INVALID_ARGUMENT: number;
+        CANNOT_OPEN: number;
+        REQUEST_FAILED: number;
+        GET_EMPTY: number;
+    };
     private _indexedDB;
     private _dbName;
     private _maxSize;
