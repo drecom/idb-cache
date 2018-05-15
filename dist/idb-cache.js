@@ -30,16 +30,6 @@
     };
   }();
 
-  var toConsumableArray = function (arr) {
-    if (Array.isArray(arr)) {
-      for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i];
-
-      return arr2;
-    } else {
-      return Array.from(arr);
-    }
-  };
-
   /**
    * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
    */
@@ -253,11 +243,19 @@
                       transaction.oncomplete = null;
                       transaction.onerror = null;
                       // Sort in ascending order of expire
-                      _this4._metaCache = new Map([].concat(toConsumableArray(_this4._metaCache.entries())).sort(function (a, b) {
+                      var sortArray = [];
+                      var itelator = _this4._metaCache.entries();
+                      var iteratorResult = itelator.next();
+                      while (!iteratorResult.done) {
+                          sortArray.push(iteratorResult.value);
+                          iteratorResult = itelator.next();
+                      }
+                      sortArray.sort(function (a, b) {
                           if (a[1].expire < b[1].expire) return -1;
                           if (a[1].expire > b[1].expire) return 1;
                           return 0;
-                      }));
+                      });
+                      _this4._metaCache = new Map(sortArray);
                       _this4._cleanup();
                   };
                   transaction.onerror = function () {

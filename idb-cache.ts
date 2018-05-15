@@ -221,11 +221,20 @@ export default class IDBCache {
         transaction.oncomplete = null;
         transaction.onerror = null;
         // Sort in ascending order of expire
-        this._metaCache = new Map([...this._metaCache.entries()].sort(function(a:any, b:any) {
+        const sortArray = [];
+        const itelator = this._metaCache.entries();
+        let iteratorResult = itelator.next();
+        while(!iteratorResult.done){
+          sortArray.push(iteratorResult.value);
+          iteratorResult = itelator.next();
+        }
+        sortArray.sort(function(a:any, b:any) {
           if (a[1].expire < b[1].expire) return -1;
           if (a[1].expire > b[1].expire) return 1;
           return 0;
-        }));
+        });
+        this._metaCache = new Map(sortArray);
+
         this._cleanup();
       }
 
