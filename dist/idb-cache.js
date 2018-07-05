@@ -131,9 +131,9 @@
                               console.error(e);
                               transaction.abort();
                           }
-                      }, function () {
+                      }, function (errorCode) {
                           // Open error
-                          reject(IDBCache.ERROR.CANNOT_OPEN);
+                          reject(errorCode);
                       });
                   });
               });
@@ -172,9 +172,9 @@
                           request.onerror = null;
                           reject(IDBCache.ERROR.REQUEST_FAILED);
                       };
-                  }, function () {
+                  }, function (errorCode) {
                       // Open error
-                      reject(IDBCache.ERROR.CANNOT_OPEN);
+                      reject(errorCode);
                   });
               });
           }
@@ -223,9 +223,9 @@
                           console.error(e);
                           transaction.abort();
                       }
-                  }, function () {
+                  }, function (errorCode) {
                       // Open error
-                      reject(IDBCache.ERROR.CANNOT_OPEN);
+                      reject(errorCode);
                   });
               });
           }
@@ -350,7 +350,7 @@
               var _this6 = this;
 
               if (!this._indexedDB) {
-                  error();
+                  error(IDBCache.ERROR.NOT_SUPPORT_IDB);
                   return;
               }
               var request = this._indexedDB.open(this._dbName, VERSION);
@@ -367,7 +367,12 @@
                   request.onblocked = null;
                   request.onsuccess = null;
                   request.onerror = null;
-                  success(request.result);
+                  try {
+                      success(request.result);
+                  } catch (e) {
+                      console.error(e);
+                      error(IDBCache.ERROR.UNKNOWN);
+                  }
               };
               request.onerror = function () {
                   console.error('IndexedDB open failed');
@@ -375,7 +380,7 @@
                   request.onblocked = null;
                   request.onsuccess = null;
                   request.onerror = null;
-                  error();
+                  error(IDBCache.ERROR.CANNOT_OPEN);
               };
           }
       }, {
@@ -442,7 +447,9 @@
       INVALID_ARGUMENT: 1,
       CANNOT_OPEN: 2,
       REQUEST_FAILED: 3,
-      GET_EMPTY: 4
+      GET_EMPTY: 4,
+      NOT_SUPPORT_IDB: 5,
+      UNKNOWN: 6
   };
 
   return IDBCache;
