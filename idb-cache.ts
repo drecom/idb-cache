@@ -24,6 +24,8 @@ export default class IDBCache {
     CANNOT_OPEN : 2,
     REQUEST_FAILED : 3,
     GET_EMPTY : 4,
+    NOT_SUPPORT_IDB : 5,
+    UNKNOWN : 6,
   }
   private _indexedDB : IDBFactory;
   private _dbName : string;
@@ -112,9 +114,9 @@ export default class IDBCache {
             console.error(e);
             transaction.abort();
           }
-        }, () => {
+        }, (errorCode) => {
           // Open error
-          reject(IDBCache.ERROR.CANNOT_OPEN);
+          reject(errorCode);
         });
       })
     });
@@ -151,9 +153,9 @@ export default class IDBCache {
           reject(IDBCache.ERROR.REQUEST_FAILED);
         };
       },
-      () => {
+      (errorCode) => {
         // Open error
-        reject(IDBCache.ERROR.CANNOT_OPEN);
+        reject(errorCode);
       });
     });
   }
@@ -203,9 +205,9 @@ export default class IDBCache {
           transaction.abort();
         }
       },
-      () => {
+      (errorCode) => {
         // Open error
-        reject(IDBCache.ERROR.CANNOT_OPEN);
+        reject(errorCode);
       });
     });
   }
@@ -352,9 +354,9 @@ export default class IDBCache {
     }
   }
 
-  private _open(success:(db:IDBDatabase) => void, error:Function){
+  private _open(success:(db:IDBDatabase) => void, error:(errorCode:number) => void){
     if(!this._indexedDB){
-      error();
+      error(IDBCache.ERROR.NOT_SUPPORT_IDB);
       return;
     }
 
@@ -372,7 +374,12 @@ export default class IDBCache {
       request.onblocked = null;
       request.onsuccess = null;
       request.onerror = null;
-      success(request.result);
+      try{
+        success(request.result);
+      }catch(e){
+        console.error(e);
+        error(IDBCache.ERROR.UNKNOWN);
+      }
     }
     request.onerror = () => {
       console.error('IndexedDB open failed');
@@ -380,7 +387,7 @@ export default class IDBCache {
       request.onblocked = null;
       request.onsuccess = null;
       request.onerror = null;
-      error();
+      error(IDBCache.ERROR.CANNOT_OPEN);
     }
   }
 

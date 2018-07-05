@@ -7,6 +7,8 @@ export default class IDBCache {
         CANNOT_OPEN: number;
         REQUEST_FAILED: number;
         GET_EMPTY: number;
+        NOT_SUPPORT_IDB: number;
+        UNKNOWN: number;
     };
     private _indexedDB;
     private _dbName;
