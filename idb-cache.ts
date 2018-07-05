@@ -16,7 +16,7 @@ const DATA_TYPE = {
 }
 
 // iPhone/iPod/iPad
-const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent); 
+const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent);
 
 export default class IDBCache {
   public static ERROR = {
@@ -55,8 +55,8 @@ export default class IDBCache {
   /**
    * Save key-value in IndexedDB.
    * Overwrite if the key already exists.
-   * @param key 
-   * @param value 
+   * @param key
+   * @param value
    * @param maxAge Number of seconds to keep
    */
   public set(key:string, value:string | ArrayBuffer | Blob, maxAge:number = this._defaultAge){
@@ -72,7 +72,7 @@ export default class IDBCache {
           const dataStore = transaction.objectStore(STORE_NAME.DATA);
           const nowSeconds = Math.floor(Date.now() / 1000);
           meta.expire = nowSeconds + maxAge;
-    
+
           transaction.oncomplete = () => {
             transaction.oncomplete = null;
             transaction.onerror = null;
@@ -84,27 +84,27 @@ export default class IDBCache {
             }
             this._metaCache.set(key, meta);
             this._nowSize += meta.size;
-    
+
             if(this._maxCount < this._metaCache.size || this._maxSize < this._nowSize){
               this._cleanup();
             }
             resolve();
           };
-    
+
           transaction.onerror = () => {
             transaction.oncomplete = null;
             transaction.onerror = null;
             transaction.onabort = null;
             reject(IDBCache.ERROR.REQUEST_FAILED);
           };
-    
+
           transaction.onabort = () => {
             transaction.oncomplete = null;
             transaction.onerror = null;
             transaction.onabort = null;
             reject(IDBCache.ERROR.REQUEST_FAILED);
           }
-    
+
           try{
             dataStore.put(data, key);
             metaStore.put(meta, key);
@@ -115,14 +115,14 @@ export default class IDBCache {
         }, () => {
           // Open error
           reject(IDBCache.ERROR.CANNOT_OPEN);
-        });  
+        });
       })
     });
   }
 
   /**
    * Get value from IndexedDB
-   * @param key 
+   * @param key
    */
   public get(key:string){
     return new Promise((resolve:Function, reject:Function) => {
@@ -160,7 +160,7 @@ export default class IDBCache {
 
   /**
    * Delete one value of IndexedDB
-   * @param key 
+   * @param key
    */
   public delete(key:string) {
     return new Promise((resolve:Function, reject:Function) => {
@@ -180,21 +180,21 @@ export default class IDBCache {
           }
           resolve();
         };
-  
+
         transaction.onerror = () => {
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
           reject(IDBCache.ERROR.REQUEST_FAILED);
         };
-  
+
         transaction.onabort = () => {
           transaction.oncomplete = null;
           transaction.onerror = null;
           transaction.onabort = null;
           reject(IDBCache.ERROR.REQUEST_FAILED);
         }
-  
+
         try{
           dataStore.delete(key);
           metaStore.delete(key);
@@ -243,15 +243,20 @@ export default class IDBCache {
         transaction.onerror = null;
       }
 
-      metaStore.openCursor().onsuccess = (event:any) => {
-        const cursor = event.target.result;
-        if (cursor) {
-          this._metaCache.set(cursor.key, cursor.value);
-          this._nowSize += cursor.value.size;
-          cursor.continue();
-        };
-      };
+      // referencing argument's event.target of openCursor() causes memory leak on Safari
+      (metaStore as any).getAllKeys().onsuccess = (keysEvent: any) => {
+        const keys = keysEvent.target.result;
+        (metaStore as any).getAll().onsuccess = (valuesEvent: any) => {
+          const values = valuesEvent.target.result;
 
+          for (var i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const val = values[i];
+            this._metaCache.set(key, val);
+            this._nowSize += val.size;
+          }
+        }
+      };
     }, () => {
       // Ignore open error
     });

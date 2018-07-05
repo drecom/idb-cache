@@ -1,3 +1,6 @@
+/**
+ * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
+ */
 export default class IDBCache {
     static ERROR: {
         INVALID_ARGUMENT: number;
@@ -35,10 +38,10 @@ export default class IDBCache {
      * @param key
      */
     delete(key: string): Promise<{}>;
-    private _initialize();
-    private _cleanup();
-    private _createObjectStore(db, oldVersion);
-    private _open(success, error);
-    private _serializeData(data, cb);
-    private _deserializeData(data, meta, cb);
+    private _initialize;
+    private _cleanup;
+    private _createObjectStore;
+    private _open;
+    private _serializeData;
+    private _deserializeData;
 }
