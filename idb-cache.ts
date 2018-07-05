@@ -217,9 +217,28 @@ export default class IDBCache {
       this._metaCache.clear();
       this._nowSize = 0;
 
+      let canGetAll = false;
+      if((metaStore as any).getAllKeys && (metaStore as any).getAll){
+        canGetAll = true;
+      }else{
+        console.warn('This device does not support getAll');
+      }
+      let allKeys : Array<string>;
+      let allValues : Array<any>;
+
       transaction.oncomplete = () => {
         transaction.oncomplete = null;
         transaction.onerror = null;
+
+        if(canGetAll){
+          for (var i = 0; i < allKeys.length; i++) {
+            const key = allKeys[i];
+            const val = allValues[i];
+            this._metaCache.set(key, val);
+            this._nowSize += val.size;
+          }
+        }
+
         // Sort in ascending order of expire
         const sortArray = [];
         const itelator = this._metaCache.entries();
@@ -244,18 +263,22 @@ export default class IDBCache {
       }
 
       // referencing argument's event.target of openCursor() causes memory leak on Safari
-      (metaStore as any).getAllKeys().onsuccess = (keysEvent: any) => {
-        const keys = keysEvent.target.result;
-        (metaStore as any).getAll().onsuccess = (valuesEvent: any) => {
-          const values = valuesEvent.target.result;
-
-          for (var i = 0; i < keys.length; i++) {
-            const key = keys[i];
-            const val = values[i];
-            this._metaCache.set(key, val);
-            this._nowSize += val.size;
-          }
-        }
+      if(canGetAll){
+        (metaStore as any).getAllKeys().onsuccess = (event: any) => {
+          allKeys = event.target.result;
+        };
+        (metaStore as any).getAll().onsuccess = (event: any) => {
+          allValues = event.target.result;
+        };
+      }else{
+        metaStore.openCursor().onsuccess = (event:any) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            this._metaCache.set(cursor.key, cursor.value);
+            this._nowSize += cursor.value.size;
+            cursor.continue();
+          };
+        };
       };
     }, () => {
       // Ignore open error
