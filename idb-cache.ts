@@ -24,6 +24,8 @@ export default class IDBCache {
     CANNOT_OPEN : 2,
     REQUEST_FAILED : 3,
     GET_EMPTY : 4,
+    NOT_SUPPORT_IDB : 5,
+    UNKNOWN : 6,
   }
   private _indexedDB : IDBFactory;
   private _dbName : string;
@@ -112,9 +114,9 @@ export default class IDBCache {
             console.error(e);
             transaction.abort();
           }
-        }, () => {
+        }, (errorCode) => {
           // Open error
-          reject(IDBCache.ERROR.CANNOT_OPEN);
+          reject(errorCode);
         });
       })
     });
@@ -151,9 +153,9 @@ export default class IDBCache {
           reject(IDBCache.ERROR.REQUEST_FAILED);
         };
       },
-      () => {
+      (errorCode) => {
         // Open error
-        reject(IDBCache.ERROR.CANNOT_OPEN);
+        reject(errorCode);
       });
     });
   }
@@ -203,9 +205,9 @@ export default class IDBCache {
           transaction.abort();
         }
       },
-      () => {
+      (errorCode) => {
         // Open error
-        reject(IDBCache.ERROR.CANNOT_OPEN);
+        reject(errorCode);
       });
     });
   }
@@ -217,9 +219,28 @@ export default class IDBCache {
       this._metaCache.clear();
       this._nowSize = 0;
 
+      let canGetAll = false;
+      if((metaStore as any).getAllKeys && (metaStore as any).getAll){
+        canGetAll = true;
+      }else{
+        console.warn('This device does not support getAll');
+      }
+      let allKeys : Array<string>;
+      let allValues : Array<any>;
+
       transaction.oncomplete = () => {
         transaction.oncomplete = null;
         transaction.onerror = null;
+
+        if(canGetAll){
+          for (var i = 0; i < allKeys.length; i++) {
+            const key = allKeys[i];
+            const val = allValues[i];
+            this._metaCache.set(key, val);
+            this._nowSize += val.size;
+          }
+        }
+
         // Sort in ascending order of expire
         const sortArray = [];
         const itelator = this._metaCache.entries();
@@ -244,18 +265,22 @@ export default class IDBCache {
       }
 
       // referencing argument's event.target of openCursor() causes memory leak on Safari
-      (metaStore as any).getAllKeys().onsuccess = (keysEvent: any) => {
-        const keys = keysEvent.target.result;
-        (metaStore as any).getAll().onsuccess = (valuesEvent: any) => {
-          const values = valuesEvent.target.result;
-
-          for (var i = 0; i < keys.length; i++) {
-            const key = keys[i];
-            const val = values[i];
-            this._metaCache.set(key, val);
-            this._nowSize += val.size;
-          }
-        }
+      if(canGetAll){
+        (metaStore as any).getAllKeys().onsuccess = (event: any) => {
+          allKeys = event.target.result;
+        };
+        (metaStore as any).getAll().onsuccess = (event: any) => {
+          allValues = event.target.result;
+        };
+      }else{
+        metaStore.openCursor().onsuccess = (event:any) => {
+          const cursor = event.target.result;
+          if (cursor) {
+            this._metaCache.set(cursor.key, cursor.value);
+            this._nowSize += cursor.value.size;
+            cursor.continue();
+          };
+        };
       };
     }, () => {
       // Ignore open error
@@ -329,9 +354,9 @@ export default class IDBCache {
     }
   }
 
-  private _open(success:(db:IDBDatabase) => void, error:Function){
+  private _open(success:(db:IDBDatabase) => void, error:(errorCode:number) => void){
     if(!this._indexedDB){
-      error();
+      error(IDBCache.ERROR.NOT_SUPPORT_IDB);
       return;
     }
 
@@ -349,7 +374,12 @@ export default class IDBCache {
       request.onblocked = null;
       request.onsuccess = null;
       request.onerror = null;
-      success(request.result);
+      try{
+        success(request.result);
+      }catch(e){
+        console.error(e);
+        error(IDBCache.ERROR.UNKNOWN);
+      }
     }
     request.onerror = () => {
       console.error('IndexedDB open failed');
@@ -357,7 +387,7 @@ export default class IDBCache {
       request.onblocked = null;
       request.onsuccess = null;
       request.onerror = null;
-      error();
+      error(IDBCache.ERROR.CANNOT_OPEN);
     }
   }
 
