@@ -239,9 +239,25 @@
                   var metaStore = transaction.objectStore(STORE_NAME.META);
                   _this4._metaCache.clear();
                   _this4._nowSize = 0;
+                  var canGetAll = false;
+                  if (metaStore.getAllKeys && metaStore.getAll) {
+                      canGetAll = true;
+                  } else {
+                      console.warn('This device does not support getAll');
+                  }
+                  var allKeys = void 0;
+                  var allValues = void 0;
                   transaction.oncomplete = function () {
                       transaction.oncomplete = null;
                       transaction.onerror = null;
+                      if (canGetAll) {
+                          for (var i = 0; i < allKeys.length; i++) {
+                              var key = allKeys[i];
+                              var val = allValues[i];
+                              _this4._metaCache.set(key, val);
+                              _this4._nowSize += val.size;
+                          }
+                      }
                       // Sort in ascending order of expire
                       var sortArray = [];
                       var itelator = _this4._metaCache.entries();
@@ -263,18 +279,23 @@
                       transaction.onerror = null;
                   };
                   // referencing argument's event.target of openCursor() causes memory leak on Safari
-                  metaStore.getAllKeys().onsuccess = function (keysEvent) {
-                      var keys = keysEvent.target.result;
-                      metaStore.getAll().onsuccess = function (valuesEvent) {
-                          var values = valuesEvent.target.result;
-                          for (var i = 0; i < keys.length; i++) {
-                              var key = keys[i];
-                              var val = values[i];
-                              _this4._metaCache.set(key, val);
-                              _this4._nowSize += val.size;
+                  if (canGetAll) {
+                      metaStore.getAllKeys().onsuccess = function (event) {
+                          allKeys = event.target.result;
+                      };
+                      metaStore.getAll().onsuccess = function (event) {
+                          allValues = event.target.result;
+                      };
+                  } else {
+                      metaStore.openCursor().onsuccess = function (event) {
+                          var cursor = event.target.result;
+                          if (cursor) {
+                              _this4._metaCache.set(cursor.key, cursor.value);
+                              _this4._nowSize += cursor.value.size;
+                              cursor.continue();
                           }
                       };
-                  };
+                  }
               }, function () {
                   // Ignore open error
               });
