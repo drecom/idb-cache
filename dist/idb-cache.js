@@ -262,13 +262,18 @@
                       transaction.oncomplete = null;
                       transaction.onerror = null;
                   };
-                  metaStore.openCursor().onsuccess = function (event) {
-                      var cursor = event.target.result;
-                      if (cursor) {
-                          _this4._metaCache.set(cursor.key, cursor.value);
-                          _this4._nowSize += cursor.value.size;
-                          cursor.continue();
-                      }
+                  // referencing argument's event.target of openCursor() causes memory leak on Safari
+                  metaStore.getAllKeys().onsuccess = function (keysEvent) {
+                      var keys = keysEvent.target.result;
+                      metaStore.getAll().onsuccess = function (valuesEvent) {
+                          var values = valuesEvent.target.result;
+                          for (var i = 0; i < keys.length; i++) {
+                              var key = keys[i];
+                              var val = values[i];
+                              _this4._metaCache.set(key, val);
+                              _this4._nowSize += val.size;
+                          }
+                      };
                   };
               }, function () {
                   // Ignore open error
