@@ -2,5 +2,6 @@
 *
 .*
 !README.md
-!dist/idb-cache.js
-!dist/idb-cache.d.ts
+!lib/idb-cache.js
+!lib/idb-cache.mjs
+!tsc/idb-cache.d.ts
