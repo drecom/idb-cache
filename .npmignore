@@ -1,7 +1,0 @@
-# whitelist
-*
-.*
-!README.md
-!lib/idb-cache.js
-!lib/idb-cache.mjs
-!tsc/idb-cache.d.ts
