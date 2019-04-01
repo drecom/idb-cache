@@ -6,7 +6,8 @@
     "README.md",
     "lib/idb-cache.js",
     "lib/idb-cache.mjs",
-    "tsc/idb-cache.d.ts"
+    "tsc/idb-cache.d.ts",
+    "dist"
   ],
   "main": "lib/idb-cache.js",
   "module": "lib/idb-cache.mjs",
