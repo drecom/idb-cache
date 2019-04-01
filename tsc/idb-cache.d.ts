@@ -17,6 +17,7 @@ export default class IDBCache {
     private _defaultAge;
     private _nowSize;
     private _metaCache;
+    private _initialization;
     constructor(dbName: string, strageLimit?: {
         size?: number;
         count?: number;
@@ -35,6 +36,11 @@ export default class IDBCache {
      * @param key
      */
     get(key: string): Promise<{}>;
+    /**
+     *  Check if the key exists
+     *  @param key
+     */
+    has(key: string): Promise<boolean>;
     /**
      * Delete one value of IndexedDB
      * @param key

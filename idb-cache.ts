@@ -34,6 +34,7 @@ export default class IDBCache {
   private _defaultAge : number = 86400; // 1day
   private _nowSize : number = 0;
   private _metaCache = new Map();
+  private _initialization : Promise<void> | void;
 
   constructor(dbName:string, strageLimit?:{size?:number, count?:number, defaultAge?:number}) {
     this._indexedDB = (window as any).indexedDB || (window as any).webkitIndexedDB || (window as any).mozIndexedDB || (window as any).OIndexedDB || (window as any).msIndexedDB;
@@ -51,7 +52,7 @@ export default class IDBCache {
       if(strageLimit.defaultAge) this._defaultAge = strageLimit.defaultAge;
     }
 
-    this._initialize();
+    this._initialization = this._initialize();
   }
 
   /**
@@ -159,6 +160,21 @@ export default class IDBCache {
       });
     });
   }
+  
+  /**
+   *  Check if the key exists
+   *  @param key
+   */
+  public has(key:string) {
+    if (!this._initialization) {
+      return Promise.reject(IDBCache.ERROR.NOT_SUPPORT_IDB);
+    }
+    return this._initialization.then(() => {
+      const cacheMeta = this._metaCache.get(key);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      return Boolean(cacheMeta && nowSeconds < cacheMeta.expire);
+    });
+  }
 
   /**
    * Delete one value of IndexedDB
@@ -213,77 +229,83 @@ export default class IDBCache {
   }
 
   private _initialize(){
-    this._open((db) => {
-      const transaction = db.transaction(STORE_NAME.META, 'readonly');
-      const metaStore = transaction.objectStore(STORE_NAME.META);
-      this._metaCache.clear();
-      this._nowSize = 0;
+    return new Promise<void>((resolve: Function) => {
+      this._open((db) => {
+        const transaction = db.transaction(STORE_NAME.META, 'readonly');
+        const metaStore = transaction.objectStore(STORE_NAME.META);
+        this._metaCache.clear();
+        this._nowSize = 0;
 
-      let canGetAll = false;
-      if((metaStore as any).getAllKeys && (metaStore as any).getAll){
-        canGetAll = true;
-      }else{
-        console.warn('This device does not support getAll');
-      }
-      let allKeys : Array<string>;
-      let allValues : Array<any>;
+        let canGetAll = false;
+        if((metaStore as any).getAllKeys && (metaStore as any).getAll){
+          canGetAll = true;
+        }else{
+          console.warn('This device does not support getAll');
+        }
+        let allKeys : Array<string>;
+        let allValues : Array<any>;
 
-      transaction.oncomplete = () => {
-        transaction.oncomplete = null;
-        transaction.onerror = null;
+        transaction.oncomplete = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
 
-        if(canGetAll){
-          for (var i = 0; i < allKeys.length; i++) {
-            const key = allKeys[i];
-            const val = allValues[i];
-            this._metaCache.set(key, val);
-            this._nowSize += val.size;
+          if(canGetAll){
+            for (var i = 0; i < allKeys.length; i++) {
+              const key = allKeys[i];
+              const val = allValues[i];
+              this._metaCache.set(key, val);
+              this._nowSize += val.size;
+            }
           }
+
+          // Sort in ascending order of expire
+          const sortArray = [];
+          const itelator = this._metaCache.entries();
+          let iteratorResult = itelator.next();
+          while(!iteratorResult.done){
+            sortArray.push(iteratorResult.value);
+            iteratorResult = itelator.next();
+          }
+          sortArray.sort(function(a:any, b:any) {
+            if (a[1].expire < b[1].expire) return -1;
+            if (a[1].expire > b[1].expire) return 1;
+            return 0;
+          });
+          this._metaCache = new Map(sortArray);
+
+          this._cleanup();
+          
+          resolve();
         }
 
-        // Sort in ascending order of expire
-        const sortArray = [];
-        const itelator = this._metaCache.entries();
-        let iteratorResult = itelator.next();
-        while(!iteratorResult.done){
-          sortArray.push(iteratorResult.value);
-          iteratorResult = itelator.next();
+        transaction.onerror = () => {
+          transaction.oncomplete = null;
+          transaction.onerror = null;
+          
+          resolve();
         }
-        sortArray.sort(function(a:any, b:any) {
-          if (a[1].expire < b[1].expire) return -1;
-          if (a[1].expire > b[1].expire) return 1;
-          return 0;
-        });
-        this._metaCache = new Map(sortArray);
 
-        this._cleanup();
-      }
-
-      transaction.onerror = () => {
-        transaction.oncomplete = null;
-        transaction.onerror = null;
-      }
-
-      // referencing argument's event.target of openCursor() causes memory leak on Safari
-      if(canGetAll){
-        (metaStore as any).getAllKeys().onsuccess = (event: any) => {
-          allKeys = event.target.result;
-        };
-        (metaStore as any).getAll().onsuccess = (event: any) => {
-          allValues = event.target.result;
-        };
-      }else{
-        metaStore.openCursor().onsuccess = (event:any) => {
-          const cursor = event.target.result;
-          if (cursor) {
-            this._metaCache.set(cursor.key, cursor.value);
-            this._nowSize += cursor.value.size;
-            cursor.continue();
+        // referencing argument's event.target of openCursor() causes memory leak on Safari
+        if(canGetAll){
+          (metaStore as any).getAllKeys().onsuccess = (event: any) => {
+            allKeys = event.target.result;
+          };
+          (metaStore as any).getAll().onsuccess = (event: any) => {
+            allValues = event.target.result;
+          };
+        }else{
+          metaStore.openCursor().onsuccess = (event:any) => {
+            const cursor = event.target.result;
+            if (cursor) {
+              this._metaCache.set(cursor.key, cursor.value);
+              this._nowSize += cursor.value.size;
+              cursor.continue();
+            };
           };
         };
-      };
-    }, () => {
-      // Ignore open error
+      }, () => {
+        // Ignore open error
+      });
     });
   }
 

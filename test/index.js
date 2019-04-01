@@ -1,8 +1,9 @@
 describe('Basic', function() {
   let idbc;
-  before(function() {
+  function init() {
     idbc = new IDBCache('Basic', {});
-  });
+  }
+  before(init);
   describe('#set', function() {
     it('string', function() {
       return idbc.set('foo', 'string');
@@ -95,6 +96,26 @@ describe('Basic', function() {
         () => assert.fail(),
         () => assert.ok(true)
       );
+    });
+  });
+  describe('#has', function() {
+    it('exists', function() {
+      return idbc.set('foo', 'string')
+        .then(() => idbc.has('foo'))
+        .then(assert.ok);
+    });
+    it('not exists', function() {
+      return idbc.delete('foo')
+        .then(() => idbc.has('foo'))
+        .then(assert.isNotOk);
+    });
+    it('multiple sessions', function() {
+      return idbc.set('foo', 'string')
+        .then(() => {
+          init();
+          return idbc.has('foo');
+        })
+        .then(assert.ok);
     });
   });
 });

@@ -69,7 +69,7 @@ var IDBCache = (function () {
         if (strageLimit.defaultAge) this._defaultAge = strageLimit.defaultAge;
       }
 
-      this._initialize();
+      this._initialization = this._initialize();
     }
     /**
      * Save key-value in IndexedDB.
@@ -197,6 +197,27 @@ var IDBCache = (function () {
         });
       }
       /**
+       *  Check if the key exists
+       *  @param key
+       */
+
+    }, {
+      key: "has",
+      value: function has(key) {
+        var _this3 = this;
+
+        if (!this._initialization) {
+          return Promise.reject(IDBCache.ERROR.NOT_SUPPORT_IDB);
+        }
+
+        return this._initialization.then(function () {
+          var cacheMeta = _this3._metaCache.get(key);
+
+          var nowSeconds = Math.floor(Date.now() / 1000);
+          return Boolean(cacheMeta && nowSeconds < cacheMeta.expire);
+        });
+      }
+      /**
        * Delete one value of IndexedDB
        * @param key
        */
@@ -204,10 +225,10 @@ var IDBCache = (function () {
     }, {
       key: "delete",
       value: function _delete(key) {
-        var _this3 = this;
+        var _this4 = this;
 
         return new Promise(function (resolve, reject) {
-          _this3._open(function (db) {
+          _this4._open(function (db) {
             var transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
             var metaStore = transaction.objectStore(STORE_NAME.META);
             var dataStore = transaction.objectStore(STORE_NAME.DATA);
@@ -217,12 +238,12 @@ var IDBCache = (function () {
               transaction.onerror = null;
               transaction.onabort = null;
 
-              var cacheMeta = _this3._metaCache.get(key);
+              var cacheMeta = _this4._metaCache.get(key);
 
               if (cacheMeta) {
-                _this3._metaCache.delete(key);
+                _this4._metaCache.delete(key);
 
-                _this3._nowSize -= cacheMeta.size;
+                _this4._nowSize -= cacheMeta.size;
               }
 
               resolve();
@@ -258,106 +279,111 @@ var IDBCache = (function () {
     }, {
       key: "_initialize",
       value: function _initialize() {
-        var _this4 = this;
+        var _this5 = this;
 
-        this._open(function (db) {
-          var transaction = db.transaction(STORE_NAME.META, 'readonly');
-          var metaStore = transaction.objectStore(STORE_NAME.META);
+        return new Promise(function (resolve) {
+          _this5._open(function (db) {
+            var transaction = db.transaction(STORE_NAME.META, 'readonly');
+            var metaStore = transaction.objectStore(STORE_NAME.META);
 
-          _this4._metaCache.clear();
+            _this5._metaCache.clear();
 
-          _this4._nowSize = 0;
-          var canGetAll = false;
+            _this5._nowSize = 0;
+            var canGetAll = false;
 
-          if (metaStore.getAllKeys && metaStore.getAll) {
-            canGetAll = true;
-          } else {
-            console.warn('This device does not support getAll');
-          }
-
-          var allKeys;
-          var allValues;
-
-          transaction.oncomplete = function () {
-            transaction.oncomplete = null;
-            transaction.onerror = null;
-
-            if (canGetAll) {
-              for (var i = 0; i < allKeys.length; i++) {
-                var key = allKeys[i];
-                var val = allValues[i];
-
-                _this4._metaCache.set(key, val);
-
-                _this4._nowSize += val.size;
-              }
-            } // Sort in ascending order of expire
-
-
-            var sortArray = [];
-
-            var itelator = _this4._metaCache.entries();
-
-            var iteratorResult = itelator.next();
-
-            while (!iteratorResult.done) {
-              sortArray.push(iteratorResult.value);
-              iteratorResult = itelator.next();
+            if (metaStore.getAllKeys && metaStore.getAll) {
+              canGetAll = true;
+            } else {
+              console.warn('This device does not support getAll');
             }
 
-            sortArray.sort(function (a, b) {
-              if (a[1].expire < b[1].expire) return -1;
-              if (a[1].expire > b[1].expire) return 1;
-              return 0;
-            });
-            _this4._metaCache = new Map(sortArray);
+            var allKeys;
+            var allValues;
 
-            _this4._cleanup();
-          };
+            transaction.oncomplete = function () {
+              transaction.oncomplete = null;
+              transaction.onerror = null;
 
-          transaction.onerror = function () {
-            transaction.oncomplete = null;
-            transaction.onerror = null;
-          }; // referencing argument's event.target of openCursor() causes memory leak on Safari
+              if (canGetAll) {
+                for (var i = 0; i < allKeys.length; i++) {
+                  var key = allKeys[i];
+                  var val = allValues[i];
+
+                  _this5._metaCache.set(key, val);
+
+                  _this5._nowSize += val.size;
+                }
+              } // Sort in ascending order of expire
 
 
-          if (canGetAll) {
-            metaStore.getAllKeys().onsuccess = function (event) {
-              allKeys = event.target.result;
-            };
+              var sortArray = [];
 
-            metaStore.getAll().onsuccess = function (event) {
-              allValues = event.target.result;
-            };
-          } else {
-            metaStore.openCursor().onsuccess = function (event) {
-              var cursor = event.target.result;
+              var itelator = _this5._metaCache.entries();
 
-              if (cursor) {
-                _this4._metaCache.set(cursor.key, cursor.value);
+              var iteratorResult = itelator.next();
 
-                _this4._nowSize += cursor.value.size;
-                cursor.continue();
+              while (!iteratorResult.done) {
+                sortArray.push(iteratorResult.value);
+                iteratorResult = itelator.next();
               }
+
+              sortArray.sort(function (a, b) {
+                if (a[1].expire < b[1].expire) return -1;
+                if (a[1].expire > b[1].expire) return 1;
+                return 0;
+              });
+              _this5._metaCache = new Map(sortArray);
+
+              _this5._cleanup();
+
+              resolve();
             };
-          }
-        }, function () {// Ignore open error
+
+            transaction.onerror = function () {
+              transaction.oncomplete = null;
+              transaction.onerror = null;
+              resolve();
+            }; // referencing argument's event.target of openCursor() causes memory leak on Safari
+
+
+            if (canGetAll) {
+              metaStore.getAllKeys().onsuccess = function (event) {
+                allKeys = event.target.result;
+              };
+
+              metaStore.getAll().onsuccess = function (event) {
+                allValues = event.target.result;
+              };
+            } else {
+              metaStore.openCursor().onsuccess = function (event) {
+                var cursor = event.target.result;
+
+                if (cursor) {
+                  _this5._metaCache.set(cursor.key, cursor.value);
+
+                  _this5._nowSize += cursor.value.size;
+                  cursor.continue();
+                }
+              };
+            }
+          }, function () {// Ignore open error
+          });
         });
       }
     }, {
       key: "_cleanup",
       value: function _cleanup() {
-        var _this5 = this;
+        var _this6 = this;
 
         this._open(function (db) {
           var removeKeys = new Set();
           var nowSeconds = Math.floor(Date.now() / 1000);
-          var tmpNowCount = _this5._metaCache.size;
+          var tmpNowCount = _this6._metaCache.size;
 
-          _this5._metaCache.forEach(function (meta, key) {
-            if (meta.expire < nowSeconds || _this5._maxSize < _this5._nowSize || _this5._maxCount < tmpNowCount) {
+          _this6._metaCache.forEach(function (meta, key) {
+            if (meta.expire < nowSeconds || _this6._maxSize < _this6._nowSize || _this6._maxCount < tmpNowCount) {
               removeKeys.add(key);
-              _this5._nowSize -= meta.size;
+              _this6._nowSize -= meta.size;
               tmpNowCount--;
             }
           });
@@ -372,7 +398,7 @@ var IDBCache = (function () {
               transaction.onerror = null;
               transaction.onabort = null;
               removeKeys.forEach(function (key) {
-                if (_this5._metaCache.has(key)) _this5._metaCache.delete(key);
+                if (_this6._metaCache.has(key)) _this6._metaCache.delete(key);
               });
             };
 
@@ -381,10 +407,10 @@ var IDBCache = (function () {
               transaction.oncomplete = null;
               transaction.onerror = null;
               transaction.onabort = null;
-              _this5._nowSize = 0;
+              _this6._nowSize = 0;
 
-              _this5._metaCache.forEach(function (meta) {
-                _this5._nowSize += meta.size;
+              _this6._metaCache.forEach(function (meta) {
+                _this6._nowSize += meta.size;
               });
             };
 
@@ -393,10 +419,10 @@ var IDBCache = (function () {
               transaction.oncomplete = null;
               transaction.onerror = null;
               transaction.onabort = null;
-              _this5._nowSize = 0;
+              _this6._nowSize = 0;
 
-              _this5._metaCache.forEach(function (meta) {
-                _this5._nowSize += meta.size;
+              _this6._metaCache.forEach(function (meta) {
+                _this6._nowSize += meta.size;
               });
             };
 
@@ -424,7 +450,7 @@ var IDBCache = (function () {
     }, {
       key: "_open",
       value: function _open(success, error) {
-        var _this6 = this;
+        var _this7 = this;
 
         if (!this._indexedDB) {
           error(IDBCache.ERROR.NOT_SUPPORT_IDB);
@@ -436,7 +462,7 @@ var IDBCache = (function () {
         request.onupgradeneeded = function (event) {
           request.onupgradeneeded = null;
 
-          _this6._createObjectStore(request.result, event.oldVersion);
+          _this7._createObjectStore(request.result, event.oldVersion);
         };
 
         request.onblocked = function () {
