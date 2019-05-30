@@ -4,20 +4,18 @@
   "description": "idb-cache is a fast and simple cache library for JavaScript using IndexedDB",
   "files": [
     "README.md",
-    "lib/idb-cache.js",
-    "lib/idb-cache.mjs",
-    "tsc/idb-cache.d.ts"
+    "dist/"
   ],
-  "main": "lib/idb-cache.js",
-  "module": "lib/idb-cache.mjs",
-  "types": "tsc/idb-cache.d.ts",
+  "main": "dist/cjs/idb-cache.js",
+  "module": "dist/esm/idb-cache.js",
+  "types": "dist/tsc/idb-cache.d.ts",
   "scripts": {
     "test": "karma start",
     "build": "npm run build:tsc && npm run build:rollup:module && npm run build:rollup:browser && npm run build:uglifyjs && npm test",
     "build:tsc": "tsc",
     "build:rollup:module": "rollup -c",
     "build:rollup:browser": "rollup -c --environment BROWSER",
-    "build:uglifyjs": "uglifyjs dist/idb-cache.js -o dist/idb-cache.min.js -cm -b beautify=false,preamble='\"// idb-cache - https://github.com/drecom/idb-cache\"'"
+    "build:uglifyjs": "uglifyjs dist/browser/idb-cache.js -o dist/browser/idb-cache.min.js -cm -b beautify=false,preamble='\"// idb-cache - https://github.com/drecom/idb-cache\"'"
   },
   "repository": {
     "type": "git",

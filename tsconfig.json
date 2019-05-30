@@ -3,7 +3,7 @@
     /* Basic Options */
     "target": "ES2015",
     "module": "es2015",
-    "outDir": "./tsc",
+    "outDir": "./dist/tsc",
     "declaration": true,
 
     /* Strict Type-Checking Options */
@@ -16,5 +16,8 @@
 
     /* Module Resolution Options */
     "esModuleInterop": true,
-  }
+  },
+  "files": [
+    "src/idb-cache.ts",
+  ]
 }
