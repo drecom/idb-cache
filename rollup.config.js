@@ -5,7 +5,7 @@ const plugins = [];
 if(process.env.BROWSER){
   // Browser
   output.push({
-    file: 'dist/idb-cache.js',
+    file: 'dist/browser/idb-cache.js',
     format: 'iife',
     intro: '// idb-cache - https://github.com/drecom/idb-cache',
     name: 'IDBCache',
@@ -30,18 +30,18 @@ if(process.env.BROWSER){
 }else{
   // CommonJS Module
   output.push({
-    file: 'lib/idb-cache.js',
+    file: 'dist/cjs/idb-cache.js',
     format: 'cjs',
   });
   // ES Module
   output.push({
-    file: 'lib/idb-cache.mjs',
+    file: 'dist/esm/idb-cache.js',
     format: 'es',
   });
 }
 
 export default {
-  input: 'tsc/idb-cache.js',
+  input: 'dist/tsc/idb-cache.js',
   output: output,
   plugins: plugins,
 };
