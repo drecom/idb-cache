@@ -290,7 +290,7 @@ export default class IDBCache {
 
   private _cleanup(){
     this._open((db) => {
-      const removeKeys = new Set();
+      const removeKeys = new Set<string>();
       const nowSeconds = Math.floor(Date.now() / 1000);
       let tmpNowCount = this._metaCache.size;
       this._metaCache.forEach((meta, key) => {
