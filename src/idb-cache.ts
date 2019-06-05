@@ -410,7 +410,7 @@ export default class IDBCache {
       console.warn('Is not supported type of value');
     }
 
-    if(useBlob && meta.type === DATA_TYPE.BLOB){
+    if(!useBlob && meta.type === DATA_TYPE.BLOB){
       const reader = new FileReader();
       reader.onload = () => {
         reader.onload = null;
