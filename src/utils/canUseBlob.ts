@@ -6,11 +6,11 @@ export default function canUseBlob(): boolean {
     const iosVerRegexResult = /ip[honead]{2,4}(?:.*os\s(\w+)\slike\smac)/i.exec(ua);
     if (iosVerRegexResult) {
       const iosVer = iosVerRegexResult[1];
-      const iosVerNums = iosVer.split('_');
+      const [major = '', minor = '', patch = ''] = iosVer.split('_');
       const iosVerStr
-        = ((iosVerNums[0] === undefined) ? '000' : ('000' + iosVerNums[0]).slice(-3))  // major
-        + ((iosVerNums[1] === undefined) ? '000' : ('000' + iosVerNums[1]).slice(-3))  // minor
-        + ((iosVerNums[2] === undefined) ? '000' : ('000' + iosVerNums[2]).slice(-3)); // patch
+        = ('000' + major).slice(-3)
+        + ('000' + minor).slice(-3)
+        + ('000' + patch).slice(-3);
       // Less than iOS12.2 can not use blob
       if (iosVerStr < '012002000') {
         return false;
