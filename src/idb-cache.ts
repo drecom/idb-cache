@@ -2,6 +2,8 @@
  * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
  */
 
+import canUseBlob from './utils/canUseBlob';
+
 const VERSION = 1;
 
 const STORE_NAME = {
@@ -15,8 +17,7 @@ const DATA_TYPE = {
   BLOB : 3,
 }
 
-// iPhone/iPod/iPad
-const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent);
+const useBlob = canUseBlob();
 
 export default class IDBCache {
   public static ERROR = {
@@ -289,7 +290,7 @@ export default class IDBCache {
 
   private _cleanup(){
     this._open((db) => {
-      const removeKeys = new Set();
+      const removeKeys = new Set<string>();
       const nowSeconds = Math.floor(Date.now() / 1000);
       let tmpNowCount = this._metaCache.size;
       this._metaCache.forEach((meta, key) => {
@@ -409,8 +410,7 @@ export default class IDBCache {
       console.warn('Is not supported type of value');
     }
 
-    // IndexedDB on iOS does not support blob
-    if(isIOS && meta.type === DATA_TYPE.BLOB){
+    if(!useBlob && meta.type === DATA_TYPE.BLOB){
       const reader = new FileReader();
       reader.onload = () => {
         reader.onload = null;
