@@ -25,9 +25,74 @@ var IDBCache = (function () {
     return Constructor;
   }
 
-  /**
-   * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
-   */
+  function _slicedToArray(arr, i) {
+    return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _nonIterableRest();
+  }
+
+  function _arrayWithHoles(arr) {
+    if (Array.isArray(arr)) return arr;
+  }
+
+  function _iterableToArrayLimit(arr, i) {
+    var _arr = [];
+    var _n = true;
+    var _d = false;
+    var _e = undefined;
+
+    try {
+      for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) {
+        _arr.push(_s.value);
+
+        if (i && _arr.length === i) break;
+      }
+    } catch (err) {
+      _d = true;
+      _e = err;
+    } finally {
+      try {
+        if (!_n && _i["return"] != null) _i["return"]();
+      } finally {
+        if (_d) throw _e;
+      }
+    }
+
+    return _arr;
+  }
+
+  function _nonIterableRest() {
+    throw new TypeError("Invalid attempt to destructure non-iterable instance");
+  }
+
+  function canUseBlob() {
+    var ua = navigator.userAgent;
+    var isIOS = /iP(hone|(o|a)d)/.test(ua);
+
+    if (isIOS) {
+      var iosVerRegexResult = /ip[honead]{2,4}(?:.*os\s(\w+)\slike\smac)/i.exec(ua);
+
+      if (iosVerRegexResult) {
+        var iosVer = iosVerRegexResult[1];
+
+        var _iosVer$split = iosVer.split('_'),
+            _iosVer$split2 = _slicedToArray(_iosVer$split, 3),
+            _iosVer$split2$ = _iosVer$split2[0],
+            major = _iosVer$split2$ === void 0 ? '' : _iosVer$split2$,
+            _iosVer$split2$2 = _iosVer$split2[1],
+            minor = _iosVer$split2$2 === void 0 ? '' : _iosVer$split2$2,
+            _iosVer$split2$3 = _iosVer$split2[2],
+            patch = _iosVer$split2$3 === void 0 ? '' : _iosVer$split2$3;
+
+        var iosVerStr = ('000' + major).slice(-3) + ('000' + minor).slice(-3) + ('000' + patch).slice(-3); // Less than iOS12.2 can not use blob
+
+        if (iosVerStr < '012002000') {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   var VERSION = 1;
   var STORE_NAME = {
     META: 'metastore',
@@ -37,9 +102,8 @@ var IDBCache = (function () {
     STRING: 1,
     ARRAYBUFFER: 2,
     BLOB: 3
-  }; // iPhone/iPod/iPad
-
-  var isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent);
+  };
+  var useBlob = canUseBlob();
 
   var IDBCache =
   /*#__PURE__*/
@@ -486,10 +550,9 @@ var IDBCache = (function () {
           meta.size = data.size;
         } else {
           console.warn('Is not supported type of value');
-        } // IndexedDB on iOS does not support blob
+        }
 
-
-        if (isIOS && meta.type === DATA_TYPE.BLOB) {
+        if (!useBlob && meta.type === DATA_TYPE.BLOB) {
           var reader = new FileReader();
 
           reader.onload = function () {

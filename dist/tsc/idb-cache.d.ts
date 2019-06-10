@@ -29,17 +29,17 @@ export default class IDBCache {
      * @param value
      * @param maxAge Number of seconds to keep
      */
-    set(key: string, value: string | ArrayBuffer | Blob, maxAge?: number): Promise<{}>;
+    set(key: string, value: string | ArrayBuffer | Blob, maxAge?: number): Promise<unknown>;
     /**
      * Get value from IndexedDB
      * @param key
      */
-    get(key: string): Promise<{}>;
+    get(key: string): Promise<unknown>;
     /**
      * Delete one value of IndexedDB
      * @param key
      */
-    delete(key: string): Promise<{}>;
+    delete(key: string): Promise<unknown>;
     private _initialize;
     private _cleanup;
     private _createObjectStore;

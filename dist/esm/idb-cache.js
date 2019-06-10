@@ -1,3 +1,23 @@
+function canUseBlob() {
+    const ua = navigator.userAgent;
+    const isIOS = /iP(hone|(o|a)d)/.test(ua);
+    if (isIOS) {
+        const iosVerRegexResult = /ip[honead]{2,4}(?:.*os\s(\w+)\slike\smac)/i.exec(ua);
+        if (iosVerRegexResult) {
+            const iosVer = iosVerRegexResult[1];
+            const [major = '', minor = '', patch = ''] = iosVer.split('_');
+            const iosVerStr = ('000' + major).slice(-3)
+                + ('000' + minor).slice(-3)
+                + ('000' + patch).slice(-3);
+            // Less than iOS12.2 can not use blob
+            if (iosVerStr < '012002000') {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 /**
  * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
  */
@@ -11,8 +31,7 @@ const DATA_TYPE = {
     ARRAYBUFFER: 2,
     BLOB: 3,
 };
-// iPhone/iPod/iPad
-const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent);
+const useBlob = canUseBlob();
 class IDBCache {
     constructor(dbName, strageLimit) {
         this._maxSize = 52428800; // 50MB
@@ -375,8 +394,7 @@ class IDBCache {
         else {
             console.warn('Is not supported type of value');
         }
-        // IndexedDB on iOS does not support blob
-        if (isIOS && meta.type === DATA_TYPE.BLOB) {
+        if (!useBlob && meta.type === DATA_TYPE.BLOB) {
             const reader = new FileReader();
             reader.onload = () => {
                 reader.onload = null;

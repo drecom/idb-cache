@@ -1,6 +1,7 @@
 /**
  * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
  */
+import canUseBlob from './utils/canUseBlob';
 const VERSION = 1;
 const STORE_NAME = {
     META: 'metastore',
@@ -11,8 +12,7 @@ const DATA_TYPE = {
     ARRAYBUFFER: 2,
     BLOB: 3,
 };
-// iPhone/iPod/iPad
-const isIOS = /iP(hone|(o|a)d);/.test(window.navigator.userAgent);
+const useBlob = canUseBlob();
 export default class IDBCache {
     constructor(dbName, strageLimit) {
         this._maxSize = 52428800; // 50MB
@@ -377,8 +377,7 @@ export default class IDBCache {
         else {
             console.warn('Is not supported type of value');
         }
-        // IndexedDB on iOS does not support blob
-        if (isIOS && meta.type === DATA_TYPE.BLOB) {
+        if (!useBlob && meta.type === DATA_TYPE.BLOB) {
             const reader = new FileReader();
             reader.onload = () => {
                 reader.onload = null;
