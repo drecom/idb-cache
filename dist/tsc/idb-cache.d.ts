@@ -1,6 +1,10 @@
 /**
  * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
+ *
+ * Modified by Swisscom (Schweiz) AG (David Rupp)
+ * -> Forked and enhanced with CryptoKeyCacheEntry
  */
+import CryptoKeyCacheEntry from "./utils/cryptoKeyCacheEntry";
 export default class IDBCache {
     static ERROR: {
         INVALID_ARGUMENT: number;
@@ -17,7 +21,7 @@ export default class IDBCache {
     private _defaultAge;
     private _nowSize;
     private _metaCache;
-    constructor(dbName: string, strageLimit?: {
+    constructor(dbName: string, storageLimit?: {
         size?: number;
         count?: number;
         defaultAge?: number;
@@ -29,7 +33,7 @@ export default class IDBCache {
      * @param value
      * @param maxAge Number of seconds to keep
      */
-    set(key: string, value: string | ArrayBuffer | Blob, maxAge?: number): Promise<unknown>;
+    set(key: string, value: string | ArrayBuffer | Blob | CryptoKeyCacheEntry, maxAge?: number): Promise<unknown>;
     /**
      * Get value from IndexedDB
      * @param key
