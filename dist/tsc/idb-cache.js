@@ -1,7 +1,11 @@
 /**
  * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
+ *
+ * Modified by Swisscom (Schweiz) AG (David Rupp)
+ * -> Forked and enhanced with CryptoKeyCacheEntry
  */
 import canUseBlob from './utils/canUseBlob';
+import CryptoKeyCacheEntry from "./utils/cryptoKeyCacheEntry";
 const VERSION = 1;
 const STORE_NAME = {
     META: 'metastore',
@@ -11,10 +15,11 @@ const DATA_TYPE = {
     STRING: 1,
     ARRAYBUFFER: 2,
     BLOB: 3,
+    CRYPTO_KEY: 4
 };
 const useBlob = canUseBlob();
 export default class IDBCache {
-    constructor(dbName, strageLimit) {
+    constructor(dbName, storageLimit) {
         this._maxSize = 52428800; // 50MB
         this._maxCount = 100; // 100files
         this._defaultAge = 86400; // 1day
@@ -26,13 +31,13 @@ export default class IDBCache {
             console.error('IndexedDB is not supported');
             return;
         }
-        if (strageLimit) {
-            if (strageLimit.size)
-                this._maxSize = strageLimit.size;
-            if (strageLimit.count)
-                this._maxCount = strageLimit.count;
-            if (strageLimit.defaultAge)
-                this._defaultAge = strageLimit.defaultAge;
+        if (storageLimit) {
+            if (storageLimit.size)
+                this._maxSize = storageLimit.size;
+            if (storageLimit.count)
+                this._maxCount = storageLimit.count;
+            if (storageLimit.defaultAge)
+                this._defaultAge = storageLimit.defaultAge;
         }
         this._initialize();
     }
@@ -374,6 +379,10 @@ export default class IDBCache {
             meta.type = DATA_TYPE.BLOB;
             meta.size = data.size;
         }
+        else if (data instanceof CryptoKeyCacheEntry) {
+            meta.type = DATA_TYPE.CRYPTO_KEY;
+            meta.size = data.length;
+        }
         else {
             console.warn('Is not supported type of value');
         }
@@ -406,6 +415,9 @@ export default class IDBCache {
         }
         else if (data instanceof Blob) {
             type = DATA_TYPE.BLOB;
+        }
+        else if (data instanceof CryptoKeyCacheEntry) {
+            type = DATA_TYPE.CRYPTO_KEY;
         }
         if (meta && meta.type === DATA_TYPE.BLOB && type === DATA_TYPE.ARRAYBUFFER) {
             const blob = new Blob([data], { type: meta.mime });

@@ -1,55 +1,62 @@
 /**
  * @author Drecom Co.,Ltd. http://www.drecom.co.jp/
+ *
+ * Modified by Swisscom (Schweiz) AG (David Rupp)
+ * -> Forked and enhanced with CryptoKeyCacheEntry
  */
 
 import canUseBlob from './utils/canUseBlob';
+import CryptoKeyCacheEntry from "./utils/cryptoKeyCacheEntry";
 
 const VERSION = 1;
 
 const STORE_NAME = {
-  META : 'metastore',
-  DATA : 'datastore',
+  META: 'metastore',
+  DATA: 'datastore',
 }
 
 const DATA_TYPE = {
-  STRING : 1,
-  ARRAYBUFFER : 2,
-  BLOB : 3,
+  STRING: 1,
+  ARRAYBUFFER: 2,
+  BLOB: 3,
+  CRYPTO_KEY: 4
 }
+
+
 
 const useBlob = canUseBlob();
 
 export default class IDBCache {
   public static ERROR = {
-    INVALID_ARGUMENT : 1,
-    CANNOT_OPEN : 2,
-    REQUEST_FAILED : 3,
-    GET_EMPTY : 4,
-    NOT_SUPPORT_IDB : 5,
-    UNKNOWN : 6,
+    INVALID_ARGUMENT: 1,
+    CANNOT_OPEN: 2,
+    REQUEST_FAILED: 3,
+    GET_EMPTY: 4,
+    NOT_SUPPORT_IDB: 5,
+    UNKNOWN: 6,
   }
-  private _indexedDB : IDBFactory;
-  private _dbName : string;
-  private _maxSize : number = 52428800; // 50MB
-  private _maxCount : number = 100; // 100files
-  private _defaultAge : number = 86400; // 1day
-  private _nowSize : number = 0;
+  private _indexedDB: IDBFactory;
+  private _dbName: string;
+  private _maxSize: number = 52428800; // 50MB
+  private _maxCount: number = 100; // 100files
+  private _defaultAge: number = 86400; // 1day
+  private _nowSize: number = 0;
   private _metaCache = new Map();
 
-  constructor(dbName:string, strageLimit?:{size?:number, count?:number, defaultAge?:number}) {
+  constructor(dbName: string, storageLimit?: { size?: number, count?: number, defaultAge?: number }) {
     this._indexedDB = (window as any).indexedDB || (window as any).webkitIndexedDB || (window as any).mozIndexedDB || (window as any).OIndexedDB || (window as any).msIndexedDB;
 
     this._dbName = dbName;
 
-    if(!this._indexedDB){
+    if (!this._indexedDB) {
       console.error('IndexedDB is not supported');
       return;
     }
 
-    if(strageLimit){
-      if(strageLimit.size) this._maxSize = strageLimit.size;
-      if(strageLimit.count) this._maxCount = strageLimit.count;
-      if(strageLimit.defaultAge) this._defaultAge = strageLimit.defaultAge;
+    if (storageLimit) {
+      if (storageLimit.size) this._maxSize = storageLimit.size;
+      if (storageLimit.count) this._maxCount = storageLimit.count;
+      if (storageLimit.defaultAge) this._defaultAge = storageLimit.defaultAge;
     }
 
     this._initialize();
@@ -62,10 +69,10 @@ export default class IDBCache {
    * @param value
    * @param maxAge Number of seconds to keep
    */
-  public set(key:string, value:string | ArrayBuffer | Blob, maxAge:number = this._defaultAge){
-    return new Promise((resolve:Function, reject:Function) => {
+  public set(key: string, value: string | ArrayBuffer | Blob | CryptoKeyCacheEntry, maxAge: number = this._defaultAge) {
+    return new Promise((resolve: Function, reject: Function) => {
       this._serializeData(value, (data, meta) => {
-        if(meta.size === 0){
+        if (meta.size === 0) {
           reject(IDBCache.ERROR.INVALID_ARGUMENT);
           return;
         }
@@ -81,14 +88,14 @@ export default class IDBCache {
             transaction.onerror = null;
             transaction.onabort = null;
             const cacheMeta = this._metaCache.get(key);
-            if(cacheMeta){
+            if (cacheMeta) {
               this._metaCache.delete(key);
               this._nowSize -= cacheMeta.size;
             }
             this._metaCache.set(key, meta);
             this._nowSize += meta.size;
 
-            if(this._maxCount < this._metaCache.size || this._maxSize < this._nowSize){
+            if (this._maxCount < this._metaCache.size || this._maxSize < this._nowSize) {
               this._cleanup();
             }
             resolve();
@@ -108,10 +115,10 @@ export default class IDBCache {
             reject(IDBCache.ERROR.REQUEST_FAILED);
           }
 
-          try{
+          try {
             dataStore.put(data, key);
             metaStore.put(meta, key);
-          }catch(e){
+          } catch (e) {
             console.error(e);
             transaction.abort();
           }
@@ -127,37 +134,37 @@ export default class IDBCache {
    * Get value from IndexedDB
    * @param key
    */
-  public get(key:string){
-    return new Promise((resolve:Function, reject:Function) => {
+  public get(key: string) {
+    return new Promise((resolve: Function, reject: Function) => {
       this._open((db) => {
-        const transaction = db.transaction(STORE_NAME.DATA, 'readonly');
-        const dataStore = transaction.objectStore(STORE_NAME.DATA);
-        const request = dataStore.get(key);
-        request.onsuccess = () => {
-          request.onsuccess = null;
-          request.onerror = null;
-          const nowSeconds = Math.floor(Date.now() / 1000);
-          const cacheMeta = this._metaCache.get(key);
-          if(request.result && cacheMeta && nowSeconds < cacheMeta.expire){
-            this._deserializeData(request.result, cacheMeta, (data) => {
-              resolve(data);
-            });
-          }else{
-            // Can not find or expired
-            reject(IDBCache.ERROR.GET_EMPTY);
-          }
-        };
+            const transaction = db.transaction(STORE_NAME.DATA, 'readonly');
+            const dataStore = transaction.objectStore(STORE_NAME.DATA);
+            const request = dataStore.get(key);
+            request.onsuccess = () => {
+              request.onsuccess = null;
+              request.onerror = null;
+              const nowSeconds = Math.floor(Date.now() / 1000);
+              const cacheMeta = this._metaCache.get(key);
+              if (request.result && cacheMeta && nowSeconds < cacheMeta.expire) {
+                this._deserializeData(request.result, cacheMeta, (data) => {
+                  resolve(data);
+                });
+              } else {
+                // Can not find or expired
+                reject(IDBCache.ERROR.GET_EMPTY);
+              }
+            };
 
-        request.onerror = () => {
-          request.onsuccess = null;
-          request.onerror = null;
-          reject(IDBCache.ERROR.REQUEST_FAILED);
-        };
-      },
-      (errorCode) => {
-        // Open error
-        reject(errorCode);
-      });
+            request.onerror = () => {
+              request.onsuccess = null;
+              request.onerror = null;
+              reject(IDBCache.ERROR.REQUEST_FAILED);
+            };
+          },
+          (errorCode) => {
+            // Open error
+            reject(errorCode);
+          });
     });
   }
 
@@ -165,55 +172,55 @@ export default class IDBCache {
    * Delete one value of IndexedDB
    * @param key
    */
-  public delete(key:string) {
-    return new Promise((resolve:Function, reject:Function) => {
+  public delete(key: string) {
+    return new Promise((resolve: Function, reject: Function) => {
       this._open((db) => {
-        const transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
-        const metaStore = transaction.objectStore(STORE_NAME.META);
-        const dataStore = transaction.objectStore(STORE_NAME.DATA);
+            const transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
+            const metaStore = transaction.objectStore(STORE_NAME.META);
+            const dataStore = transaction.objectStore(STORE_NAME.DATA);
 
-        transaction.oncomplete = () => {
-          transaction.oncomplete = null;
-          transaction.onerror = null;
-          transaction.onabort = null;
-          const cacheMeta = this._metaCache.get(key);
-          if(cacheMeta){
-            this._metaCache.delete(key);
-            this._nowSize -= cacheMeta.size;
-          }
-          resolve();
-        };
+            transaction.oncomplete = () => {
+              transaction.oncomplete = null;
+              transaction.onerror = null;
+              transaction.onabort = null;
+              const cacheMeta = this._metaCache.get(key);
+              if (cacheMeta) {
+                this._metaCache.delete(key);
+                this._nowSize -= cacheMeta.size;
+              }
+              resolve();
+            };
 
-        transaction.onerror = () => {
-          transaction.oncomplete = null;
-          transaction.onerror = null;
-          transaction.onabort = null;
-          reject(IDBCache.ERROR.REQUEST_FAILED);
-        };
+            transaction.onerror = () => {
+              transaction.oncomplete = null;
+              transaction.onerror = null;
+              transaction.onabort = null;
+              reject(IDBCache.ERROR.REQUEST_FAILED);
+            };
 
-        transaction.onabort = () => {
-          transaction.oncomplete = null;
-          transaction.onerror = null;
-          transaction.onabort = null;
-          reject(IDBCache.ERROR.REQUEST_FAILED);
-        }
+            transaction.onabort = () => {
+              transaction.oncomplete = null;
+              transaction.onerror = null;
+              transaction.onabort = null;
+              reject(IDBCache.ERROR.REQUEST_FAILED);
+            }
 
-        try{
-          dataStore.delete(key);
-          metaStore.delete(key);
-        }catch(e){
-          console.error(e);
-          transaction.abort();
-        }
-      },
-      (errorCode) => {
-        // Open error
-        reject(errorCode);
-      });
+            try {
+              dataStore.delete(key);
+              metaStore.delete(key);
+            } catch (e) {
+              console.error(e);
+              transaction.abort();
+            }
+          },
+          (errorCode) => {
+            // Open error
+            reject(errorCode);
+          });
     });
   }
 
-  private _initialize(){
+  private _initialize() {
     this._open((db) => {
       const transaction = db.transaction(STORE_NAME.META, 'readonly');
       const metaStore = transaction.objectStore(STORE_NAME.META);
@@ -221,19 +228,19 @@ export default class IDBCache {
       this._nowSize = 0;
 
       let canGetAll = false;
-      if((metaStore as any).getAllKeys && (metaStore as any).getAll){
+      if ((metaStore as any).getAllKeys && (metaStore as any).getAll) {
         canGetAll = true;
-      }else{
+      } else {
         console.warn('This device does not support getAll');
       }
-      let allKeys : Array<string>;
-      let allValues : Array<any>;
+      let allKeys: Array<string>;
+      let allValues: Array<any>;
 
       transaction.oncomplete = () => {
         transaction.oncomplete = null;
         transaction.onerror = null;
 
-        if(canGetAll){
+        if (canGetAll) {
           for (var i = 0; i < allKeys.length; i++) {
             const key = allKeys[i];
             const val = allValues[i];
@@ -246,11 +253,11 @@ export default class IDBCache {
         const sortArray = [];
         const itelator = this._metaCache.entries();
         let iteratorResult = itelator.next();
-        while(!iteratorResult.done){
+        while (!iteratorResult.done) {
           sortArray.push(iteratorResult.value);
           iteratorResult = itelator.next();
         }
-        sortArray.sort(function(a:any, b:any) {
+        sortArray.sort(function (a: any, b: any) {
           if (a[1].expire < b[1].expire) return -1;
           if (a[1].expire > b[1].expire) return 1;
           return 0;
@@ -266,41 +273,43 @@ export default class IDBCache {
       }
 
       // referencing argument's event.target of openCursor() causes memory leak on Safari
-      if(canGetAll){
+      if (canGetAll) {
         (metaStore as any).getAllKeys().onsuccess = (event: any) => {
           allKeys = event.target.result;
         };
         (metaStore as any).getAll().onsuccess = (event: any) => {
           allValues = event.target.result;
         };
-      }else{
-        metaStore.openCursor().onsuccess = (event:any) => {
+      } else {
+        metaStore.openCursor().onsuccess = (event: any) => {
           const cursor = event.target.result;
           if (cursor) {
             this._metaCache.set(cursor.key, cursor.value);
             this._nowSize += cursor.value.size;
             cursor.continue();
-          };
+          }
+          ;
         };
-      };
+      }
+      ;
     }, () => {
       // Ignore open error
     });
   }
 
-  private _cleanup(){
+  private _cleanup() {
     this._open((db) => {
       const removeKeys = new Set<string>();
       const nowSeconds = Math.floor(Date.now() / 1000);
       let tmpNowCount = this._metaCache.size;
       this._metaCache.forEach((meta, key) => {
-        if(meta.expire < nowSeconds || this._maxSize < this._nowSize || this._maxCount < tmpNowCount){
+        if (meta.expire < nowSeconds || this._maxSize < this._nowSize || this._maxCount < tmpNowCount) {
           removeKeys.add(key);
           this._nowSize -= meta.size;
           tmpNowCount--;
         }
       });
-      if(0 < removeKeys.size){
+      if (0 < removeKeys.size) {
         const transaction = db.transaction([STORE_NAME.META, STORE_NAME.DATA], 'readwrite');
         const metaStore = transaction.objectStore(STORE_NAME.META);
         const dataStore = transaction.objectStore(STORE_NAME.DATA);
@@ -309,7 +318,7 @@ export default class IDBCache {
           transaction.onerror = null;
           transaction.onabort = null;
           removeKeys.forEach((key) => {
-            if(this._metaCache.has(key)) this._metaCache.delete(key);
+            if (this._metaCache.has(key)) this._metaCache.delete(key);
           });
         };
         transaction.onerror = () => {
@@ -334,10 +343,10 @@ export default class IDBCache {
         };
 
         removeKeys.forEach((key) => {
-          try{
+          try {
             dataStore.delete(key);
             metaStore.delete(key);
-          }catch(e){
+          } catch (e) {
             transaction.abort();
           }
         });
@@ -347,16 +356,16 @@ export default class IDBCache {
     });
   }
 
-  private _createObjectStore(db:IDBDatabase ,oldVersion:number){
-    if(oldVersion < 1){
+  private _createObjectStore(db: IDBDatabase, oldVersion: number) {
+    if (oldVersion < 1) {
       // Structure of first edition
       db.createObjectStore(STORE_NAME.META);
       db.createObjectStore(STORE_NAME.DATA);
     }
   }
 
-  private _open(success:(db:IDBDatabase) => void, error:(errorCode:number) => void){
-    if(!this._indexedDB){
+  private _open(success: (db: IDBDatabase) => void, error: (errorCode: number) => void) {
+    if (!this._indexedDB) {
       error(IDBCache.ERROR.NOT_SUPPORT_IDB);
       return;
     }
@@ -375,9 +384,9 @@ export default class IDBCache {
       request.onblocked = null;
       request.onsuccess = null;
       request.onerror = null;
-      try{
+      try {
         success(request.result);
-      }catch(e){
+      } catch (e) {
         console.error(e);
         error(IDBCache.ERROR.UNKNOWN);
       }
@@ -392,25 +401,28 @@ export default class IDBCache {
     }
   }
 
-  private _serializeData(data:string | ArrayBuffer | Blob, cb:(data:any, meta:any) => void){
+  private _serializeData(data: string | ArrayBuffer | Blob | CryptoKeyCacheEntry, cb: (data: any, meta: any) => void) {
     const meta = {
-      type:0,
-      size:0,
+      type: 0,
+      size: 0,
     }
-    if(typeof data === 'string'){
+    if (typeof data === 'string') {
       meta.type = DATA_TYPE.STRING;
       meta.size = (data as string).length;
-    }else if(data instanceof ArrayBuffer){
+    } else if (data instanceof ArrayBuffer) {
       meta.type = DATA_TYPE.ARRAYBUFFER;
       meta.size = (data as ArrayBuffer).byteLength;
-    }else if(data instanceof Blob){
+    } else if (data instanceof Blob) {
       meta.type = DATA_TYPE.BLOB;
       meta.size = (data as Blob).size;
-    }else{
+    } else if (data instanceof CryptoKeyCacheEntry) {
+      meta.type = DATA_TYPE.CRYPTO_KEY;
+      meta.size = data.length;
+    } else {
       console.warn('Is not supported type of value');
     }
 
-    if(!useBlob && meta.type === DATA_TYPE.BLOB){
+    if (!useBlob && meta.type === DATA_TYPE.BLOB) {
       const reader = new FileReader();
       reader.onload = () => {
         reader.onload = null;
@@ -424,25 +436,27 @@ export default class IDBCache {
         cb(null, meta);
       }
       reader.readAsArrayBuffer(data as Blob);
-    }else{
+    } else {
       cb(data, meta);
     }
   }
 
-  private _deserializeData(data:string | ArrayBuffer | Blob, meta:any, cb:(data:any) => void){
+  private _deserializeData(data: any, meta: any, cb: (data: any) => void) {
     let type = 0;
-    if(typeof data === 'string'){
+    if (typeof data === 'string') {
       type = DATA_TYPE.STRING;
-    }else if(data instanceof ArrayBuffer){
+    } else if (data instanceof ArrayBuffer) {
       type = DATA_TYPE.ARRAYBUFFER;
-    }else if(data instanceof Blob){
+    } else if (data instanceof Blob) {
       type = DATA_TYPE.BLOB;
+    } else if (data instanceof CryptoKeyCacheEntry) {
+      type = DATA_TYPE.CRYPTO_KEY;
     }
 
-    if(meta && meta.type === DATA_TYPE.BLOB && type === DATA_TYPE.ARRAYBUFFER){
-      const blob = new Blob([data], {type:meta.mime});
+    if (meta && meta.type === DATA_TYPE.BLOB && type === DATA_TYPE.ARRAYBUFFER) {
+      const blob = new Blob([data], {type: meta.mime});
       cb(blob);
-    }else{
+    } else {
       cb(data);
     }
   }

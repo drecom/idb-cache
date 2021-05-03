@@ -93,6 +93,37 @@ var IDBCache = (function () {
     return true;
   }
 
+  var CryptoKeyCacheEntry =
+  /*#__PURE__*/
+  function () {
+    _createClass(CryptoKeyCacheEntry, [{
+      key: "length",
+      get: function get() {
+        return this._length;
+      }
+    }, {
+      key: "key",
+      get: function get() {
+        return this._key;
+      }
+    }, {
+      key: "id",
+      get: function get() {
+        return this._id;
+      }
+    }]);
+
+    function CryptoKeyCacheEntry(id, key, length) {
+      _classCallCheck(this, CryptoKeyCacheEntry);
+
+      this._id = id;
+      this._key = key;
+      this._length = length;
+    }
+
+    return CryptoKeyCacheEntry;
+  }();
+
   var VERSION = 1;
   var STORE_NAME = {
     META: 'metastore',
@@ -101,14 +132,15 @@ var IDBCache = (function () {
   var DATA_TYPE = {
     STRING: 1,
     ARRAYBUFFER: 2,
-    BLOB: 3
+    BLOB: 3,
+    CRYPTO_KEY: 4
   };
   var useBlob = canUseBlob();
 
   var IDBCache =
   /*#__PURE__*/
   function () {
-    function IDBCache(dbName, strageLimit) {
+    function IDBCache(dbName, storageLimit) {
       _classCallCheck(this, IDBCache);
 
       this._maxSize = 52428800; // 50MB
@@ -127,10 +159,10 @@ var IDBCache = (function () {
         return;
       }
 
-      if (strageLimit) {
-        if (strageLimit.size) this._maxSize = strageLimit.size;
-        if (strageLimit.count) this._maxCount = strageLimit.count;
-        if (strageLimit.defaultAge) this._defaultAge = strageLimit.defaultAge;
+      if (storageLimit) {
+        if (storageLimit.size) this._maxSize = storageLimit.size;
+        if (storageLimit.count) this._maxCount = storageLimit.count;
+        if (storageLimit.defaultAge) this._defaultAge = storageLimit.defaultAge;
       }
 
       this._initialize();
@@ -548,6 +580,9 @@ var IDBCache = (function () {
         } else if (data instanceof Blob) {
           meta.type = DATA_TYPE.BLOB;
           meta.size = data.size;
+        } else if (data instanceof CryptoKeyCacheEntry) {
+          meta.type = DATA_TYPE.CRYPTO_KEY;
+          meta.size = data.length;
         } else {
           console.warn('Is not supported type of value');
         }
@@ -584,6 +619,8 @@ var IDBCache = (function () {
           type = DATA_TYPE.ARRAYBUFFER;
         } else if (data instanceof Blob) {
           type = DATA_TYPE.BLOB;
+        } else if (data instanceof CryptoKeyCacheEntry) {
+          type = DATA_TYPE.CRYPTO_KEY;
         }
 
         if (meta && meta.type === DATA_TYPE.BLOB && type === DATA_TYPE.ARRAYBUFFER) {
